@@ -1,10 +1,9 @@
 import rateLimit from 'express-rate-limit'
+import { RedisStore } from 'rate-limit-redis'
 import type { Request, Response } from 'express'
-import RedisStore from 'rate-limit-redis'
-import type { RedisReply } from 'rate-limit-redis' // ← import the type
-import { redisConnection } from '../config/redis'
+import { redisConnection } from '../config/redis.js'
 
-// ── Shared rate limit response handler ────────────────────────────────────────
+// ── Shared response handler ───────────────────────────────────────────────────
 
 const rateLimitHandler = (_req: Request, res: Response): void => {
   res.status(429).json({
@@ -13,6 +12,28 @@ const rateLimitHandler = (_req: Request, res: Response): void => {
   })
 }
 
+// ── Redis store factory ───────────────────────────────────────────────────────
+
+const makeRedisStore = (prefix: string): RedisStore =>
+  new RedisStore({
+    sendCommand: async (...args: string[]) => {
+      // noUncheckedIndexedAccess: guard args[0] before use
+      const command = args[0]
+      if (!command) return 0
+
+      const result = await (redisConnection.call(
+        command,
+        ...args.slice(1),
+      ) as Promise<unknown>)
+
+      // RedisReply does not include null — coerce to 0 so types align
+      if (result === null || result === undefined) return 0
+
+      return result as number | string | string[]
+    },
+    prefix,
+  })
+
 // ── Limiters ──────────────────────────────────────────────────────────────────
 
 export const generalLimiter = rateLimit({
@@ -20,6 +41,7 @@ export const generalLimiter = rateLimit({
   max: Number(process.env['RATE_LIMIT_MAX_GENERAL'] ?? '200'),
   standardHeaders: true,
   legacyHeaders: false,
+  store: makeRedisStore('rl:general:'),
   handler: rateLimitHandler,
 })
 
@@ -28,10 +50,7 @@ export const authLimiter = rateLimit({
   max: Number(process.env['RATE_LIMIT_MAX_AUTH'] ?? '10'),
   standardHeaders: true,
   legacyHeaders: false,
-  store: new RedisStore({
-    sendCommand: (command: string, ...args: string[]) =>
-      redisConnection.call(command, ...args) as Promise<RedisReply>, // ← cast to RedisReply
-  }),
+  store: makeRedisStore('rl:auth:'),
   handler: rateLimitHandler,
 })
 
@@ -40,5 +59,6 @@ export const uploadLimiter = rateLimit({
   max: Number(process.env['RATE_LIMIT_MAX_UPLOAD'] ?? '20'),
   standardHeaders: true,
   legacyHeaders: false,
+  store: makeRedisStore('rl:upload:'),
   handler: rateLimitHandler,
 })
