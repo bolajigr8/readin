@@ -11,7 +11,7 @@ import { conversionQueue, type ConversionJobData } from '../jobs/queue.js'
 import { successResponse, errorResponse } from '../utils/response.utils.js'
 import type { OriginalFormat } from '../models/book.model.js'
 
-// ── pdf-parse v2.x cast (see Prompt 2 notes) ─────────────────────────────────
+// ── pdf-parse v2.x cast ───────────────────────────────────────────────────────
 interface PdfData {
   text: string
   numpages: number
@@ -19,8 +19,7 @@ interface PdfData {
 type PdfParseFn = (dataBuffer: Buffer) => Promise<PdfData>
 const pdfParse = pdfParseMod as unknown as PdfParseFn
 
-// ── MIME → OriginalFormat map ─────────────────────────────────────────────────
-
+// ── MIME → format map ─────────────────────────────────────────────────────────
 const MIME_TO_FORMAT: Record<string, OriginalFormat> = {
   'application/pdf': 'pdf',
   'application/epub+zip': 'epub',
@@ -32,13 +31,9 @@ const MIME_TO_FORMAT: Record<string, OriginalFormat> = {
 
 const MIN_TEXT_LENGTH = 100
 
-// ── Controllers ───────────────────────────────────────────────────────────────
+// ── uploadFile ────────────────────────────────────────────────────────────────
 
-/**
- * POST /api/v1/files/upload
- */
 export const uploadFile = asyncHandler(async (req: Request, res: Response) => {
-  // 1. Confirm Multer attached a file
   if (!req.file) {
     errorResponse(
       res,
@@ -50,7 +45,7 @@ export const uploadFile = asyncHandler(async (req: Request, res: Response) => {
 
   const { buffer, mimetype, originalname, size } = req.file
 
-  // 2. Text-based PDF check
+  // PDF text-based check
   if (mimetype === 'application/pdf') {
     try {
       const pdfData = await pdfParse(buffer)
@@ -72,18 +67,16 @@ export const uploadFile = asyncHandler(async (req: Request, res: Response) => {
     }
   }
 
-  // 3. Derive original format
   const originalFormat = MIME_TO_FORMAT[mimetype]
   if (!originalFormat) {
     errorResponse(res, 'Unsupported file type.', 400)
     return
   }
 
-  // 4. Build unique Cloudinary filename
   const baseName = path.parse(originalname).name.replace(/\s+/g, '_')
   const filename = `${baseName}_${uuidv4()}`
 
-  // 5. Upload original file to Cloudinary
+  // Upload original to Cloudinary
   let uploadResult: { url: string; publicId: string }
   try {
     uploadResult = await cloudinaryService.uploadFile(buffer, {
@@ -97,7 +90,6 @@ export const uploadFile = asyncHandler(async (req: Request, res: Response) => {
     return
   }
 
-  // 6. Auth guard
   if (!req.user) {
     errorResponse(res, 'Not authenticated.', 401)
     return
@@ -105,7 +97,7 @@ export const uploadFile = asyncHandler(async (req: Request, res: Response) => {
 
   const { userId } = req.user
 
-  // 7. Create Book document
+  // Create Book document
   const book = await Book.create({
     userId,
     title: baseName.replace(/_/g, ' '),
@@ -116,9 +108,8 @@ export const uploadFile = asyncHandler(async (req: Request, res: Response) => {
     status: 'queued',
   })
 
-  // 8. Create Job document (temporary UUID — will be replaced with BullMQ ID below)
+  // Create Job document
   const tempJobId = uuidv4()
-
   await Job.create({
     jobId: tempJobId,
     userId,
@@ -126,26 +117,22 @@ export const uploadFile = asyncHandler(async (req: Request, res: Response) => {
     status: 'waiting',
   })
 
-  // 9. Encode buffer → base64 for Redis serialisation
-  const base64Buffer = buffer.toString('base64')
-
-  // 10. Dispatch BullMQ conversion job
+  // ── Dispatch BullMQ job ───────────────────────────────────────────────────
+  // No base64 buffer — worker downloads directly from Cloudinary.
+  // This keeps Redis payloads tiny (~200 bytes) regardless of file size.
   const jobPayload: ConversionJobData = {
     bookId: book._id.toString(),
     jobId: tempJobId,
     userId,
-    fileBuffer: base64Buffer,
+    originalFileUrl: uploadResult.url, // ← Cloudinary URL only
     originalFilename: originalname,
     originalFormat,
   }
 
   const bullJob = await conversionQueue.add('convert', jobPayload)
 
-  // 11. Replace temp UUID with the BullMQ-assigned job ID (used by client to poll)
   const finalJobId = bullJob.id ?? tempJobId
-
   await Job.findOneAndUpdate({ jobId: tempJobId }, { jobId: finalJobId })
-
   book.jobId = finalJobId
   await book.save()
 
@@ -162,9 +149,8 @@ export const uploadFile = asyncHandler(async (req: Request, res: Response) => {
   )
 })
 
-/**
- * GET /api/v1/files/job/:jobId
- */
+// ── getJobStatus ──────────────────────────────────────────────────────────────
+
 export const getJobStatus = asyncHandler(
   async (req: Request, res: Response) => {
     const jobId = req.params['jobId']

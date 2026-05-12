@@ -5,7 +5,7 @@ export interface ConversionJobData {
   bookId: string
   jobId: string
   userId: string
-  fileBuffer: string // base64 encoded — buffers can't be serialised to Redis directly
+  originalFileUrl: string // ← Cloudinary URL — worker downloads from here
   originalFilename: string
   originalFormat: string
 }
