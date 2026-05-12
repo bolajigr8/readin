@@ -1,0 +1,4 @@
+Things to Note:
+
+One thing to be aware of before testing
+The fileBuffer (base64 encoded) goes into Redis via BullMQ. On Upstash's free tier the max message payload is 1MB and on paid tiers it's higher. For large PDFs this will breach the limit. The correct production fix is to skip storing the buffer in Redis entirely and have the worker re-download the file from Cloudinary's originalFileUrl instead — but that's an optimisation for after the full system is wired up and tested end to end.
