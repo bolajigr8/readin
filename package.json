@@ -1,0 +1,20 @@
+{
+  "name": "readin-monorepo",
+  "private": true,
+  "scripts": {
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "server/**/*.{ts,js}": [
+      "bash -c 'cd server && pnpm exec eslint --fix'",
+      "bash -c 'cd server && pnpm exec prettier --write'"
+    ],
+    "mobile/**/*.{ts,tsx,js,jsx}": [
+      "bash -c 'cd mobile && pnpm run lint'"
+    ]
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.4"
+  }
+}

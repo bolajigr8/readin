@@ -1,0 +1,8 @@
+cd server
+pnpm exec lint-staged
+pnpm run typecheck
+cd ..
+
+cd mobile
+pnpm run lint
+cd ..

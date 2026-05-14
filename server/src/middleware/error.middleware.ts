@@ -30,7 +30,7 @@ export const globalErrorHandler = (
 
   // ── Mongoose validation error ─────────────────────────────────────────────
   if (hasName(err, 'ValidationError') && isObject(err) && 'errors' in err) {
-    const validationErr = err as MongooseValidationError
+    const validationErr = err as unknown as MongooseValidationError
     const fieldErrors = Object.fromEntries(
       Object.entries(validationErr.errors).map(([key, val]) => [
         key,
