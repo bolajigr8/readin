@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "node dist/app.js",
     "typecheck": "tsc --noEmit",
+    "seed": "tsx src/scripts/seed.ts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write ."
