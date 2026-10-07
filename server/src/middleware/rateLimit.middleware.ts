@@ -46,6 +46,9 @@ export const generalLimiter = rateLimit({
 })
 
 export const authLimiter = rateLimit({
+  // Silent token refresh (/auth/refresh) and logout are NOT brute-force
+  // targets; counting them against the 10/15min budget used to log users out.
+  skip: (req: Request) => req.path === '/refresh' || req.path === '/logout',
   windowMs: 15 * 60 * 1000,
   max: Number(process.env['RATE_LIMIT_MAX_AUTH'] ?? '10'),
   standardHeaders: true,

@@ -5,7 +5,6 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 
 import { connectDB } from './config/db.js';
-import { conversionWorker } from './jobs/conversion.worker.js';
 import { generalLimiter, authLimiter } from './middleware/rateLimit.middleware.js';
 import { globalErrorHandler, notFoundHandler } from './middleware/error.middleware.js';
 
@@ -90,8 +89,13 @@ const PORT = process.env['PORT'] ?? '5000';
 const start = async (): Promise<void> => {
   await connectDB();
 
-  void conversionWorker; // ensures the module is initialised and worker starts
-  console.log('🔄 BullMQ conversion worker started');
+  // Conversion is ON HOLD by default. Set CONVERSION_ENABLED=true to start it.
+  if (process.env['CONVERSION_ENABLED'] === 'true') {
+    await import('./jobs/conversion.worker.js');
+    console.log('🔄 BullMQ conversion worker started');
+  } else {
+    console.log('⏸️  Conversion worker disabled (CONVERSION_ENABLED != true)');
+  }
 
   app.listen(Number(PORT), () => {
     console.log(`🚀 Server running on port ${PORT}`);

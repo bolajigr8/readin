@@ -2,24 +2,27 @@ import type { Request, Response } from 'express';
 import asyncHandler from 'express-async-handler';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
-import pdfParseMod from 'pdf-parse';
 
 import { cloudinaryService } from '../services/cloudinary.service.js';
 import { Book } from '../models/book.model.js';
 import { Job } from '../models/job.model.js';
-import { conversionQueue, type ConversionJobData } from '../jobs/queue.js';
 import { successResponse, errorResponse } from '../utils/response.utils.js';
 import type { OriginalFormat } from '../models/book.model.js';
 
-// ── pdf-parse v2.x cast ───────────────────────────────────────────────────────
-interface PdfData {
-  text: string;
-  numpages: number;
-}
-type PdfParseFn = (dataBuffer: Buffer) => Promise<PdfData>;
-const pdfParse = pdfParseMod as unknown as PdfParseFn;
+// ── Feature flag ──────────────────────────────────────────────────────────────
+// Conversion (PDF/DOCX/MOBI/TXT → EPUB via Calibre) is ON HOLD.
+// While CONVERSION_ENABLED !== 'true' the server simply stores PDF and EPUB
+// files as-is and marks them "ready". The mobile app reads both natively.
+// Flip the env var to 'true' later to bring the queue back.
+export const CONVERSION_ENABLED = process.env['CONVERSION_ENABLED'] === 'true';
 
-// ── MIME → format map ─────────────────────────────────────────────────────────
+const FREE_PLAN_LIBRARY_LIMIT = 10;
+
+// ── Format detection ──────────────────────────────────────────────────────────
+// Phones very often send "application/octet-stream" (or nothing) for .epub
+// files, so we CANNOT trust the mimetype alone. Resolve in this order:
+// 1. known mimetype  2. file extension  3. magic bytes sanity check.
+
 const MIME_TO_FORMAT: Record<string, OriginalFormat> = {
   'application/pdf': 'pdf',
   'application/epub+zip': 'epub',
@@ -28,9 +31,48 @@ const MIME_TO_FORMAT: Record<string, OriginalFormat> = {
   'text/plain': 'txt',
 };
 
-// Minimum characters for a PDF to be considered text-based.
-// Below this threshold it's likely scanned/image-only.
+const EXT_TO_FORMAT: Record<string, OriginalFormat> = {
+  '.pdf': 'pdf',
+  '.epub': 'epub',
+  '.mobi': 'mobi',
+  '.docx': 'docx',
+  '.txt': 'txt',
+};
+
+const resolveFormat = (mimetype: string, originalname: string): OriginalFormat | null => {
+  const ext = path.extname(originalname).toLowerCase();
+  const byExt = EXT_TO_FORMAT[ext];
+  const byMime = MIME_TO_FORMAT[mimetype];
+  // Extension wins when the mimetype is generic/unknown.
+  return byMime ?? byExt ?? null;
+};
+
+/** Cheap content sniffing so a renamed/corrupt file is rejected up-front. */
+const looksLikeFormat = (buf: Buffer, format: OriginalFormat): boolean => {
+  if (format === 'pdf') return buf.subarray(0, 5).toString('latin1') === '%PDF-';
+  if (format === 'epub') return buf.length > 4 && buf[0] === 0x50 && buf[1] === 0x4b; // "PK" zip
+  return true;
+};
+
+// Only used when conversion is enabled. pdf-parse v2 is a CLASS api
+// (new PDFParse({ data }).getText()) — the old v1 `pdfParse(buffer)` call does
+// not exist and used to make EVERY PDF upload fail with "Could not read this PDF".
 const MIN_TEXT_LENGTH = 100;
+const isTextBasedPdf = async (buffer: Buffer): Promise<boolean> => {
+  const mod = (await import('pdf-parse')) as unknown as {
+    PDFParse: new (opts: { data: Uint8Array }) => {
+      getText: () => Promise<{ text: string }>;
+      destroy?: () => Promise<void>;
+    };
+  };
+  const parser = new mod.PDFParse({ data: new Uint8Array(buffer) });
+  try {
+    const result = await parser.getText();
+    return result.text.trim().length >= MIN_TEXT_LENGTH;
+  } finally {
+    await parser.destroy?.().catch(() => undefined);
+  }
+};
 
 // ── uploadFile ────────────────────────────────────────────────────────────────
 
@@ -50,48 +92,70 @@ export const uploadFile = asyncHandler(async (req: Request, res: Response) => {
   }
 
   const { buffer, mimetype, originalname, size } = req.file;
-  const { userId } = req.user;
+  const { userId, plan } = req.user;
 
   // ── Validate format ───────────────────────────────────────────────────────
-  const originalFormat = MIME_TO_FORMAT[mimetype];
+  const originalFormat = resolveFormat(mimetype, originalname);
   if (!originalFormat) {
+    errorResponse(res, 'Unsupported file type. Accepted formats: PDF and EPUB.', 400);
+    return;
+  }
+
+  // While conversion is on hold only natively-readable formats are accepted.
+  if (!CONVERSION_ENABLED && originalFormat !== 'pdf' && originalFormat !== 'epub') {
     errorResponse(
       res,
-      `Unsupported file type "${mimetype}". Accepted formats: PDF, EPUB, DOCX, MOBI, TXT.`,
+      `${originalFormat.toUpperCase()} import is paused for now. Please import a PDF or EPUB file.`,
       400,
     );
     return;
   }
 
-  // ── PDF: validate it is text-based, not a scanned image ──────────────────
-  // Scanned/image PDFs have no extractable text. Calibre cannot convert them.
-  // We check upfront so the user gets a clear error immediately.
-  if (mimetype === 'application/pdf') {
-    try {
-      const pdfData = await pdfParse(buffer);
-      if (pdfData.text.trim().length < MIN_TEXT_LENGTH) {
-        errorResponse(
-          res,
-          'This PDF appears to be scanned or image-based. Only text-based PDFs can be converted. ' +
-            'Tip: If you have the original document (Word, etc.), upload that instead.',
-          400,
-        );
-        return;
-      }
-    } catch {
+  if (!looksLikeFormat(buffer, originalFormat)) {
+    errorResponse(
+      res,
+      `This file does not look like a valid ${originalFormat.toUpperCase()}. It may be corrupted.`,
+      400,
+    );
+    return;
+  }
+
+  // ── Free-plan library limit (same rule the Discover flow already enforces) ─
+  if (plan === 'free') {
+    const count = await Book.countDocuments({ userId, status: 'ready' });
+    if (count >= FREE_PLAN_LIBRARY_LIMIT) {
       errorResponse(
         res,
-        'Could not read this PDF. The file may be password-protected or corrupted. ' +
-          'Please try a different PDF.',
-        400,
+        `Free plan is limited to ${FREE_PLAN_LIBRARY_LIMIT} books. Upgrade to Premium for unlimited access.`,
+        403,
       );
       return;
     }
   }
 
+  // ── Conversion path only: PDF must be text-based ──────────────────────────
+  if (CONVERSION_ENABLED && originalFormat === 'pdf') {
+    try {
+      if (!(await isTextBasedPdf(buffer))) {
+        errorResponse(
+          res,
+          'This PDF appears to be scanned or image-based. Only text-based PDFs can be converted.',
+          400,
+        );
+        return;
+      }
+    } catch (err) {
+      console.error('[upload] pdf-parse failed:', err);
+      errorResponse(res, 'Could not read this PDF. It may be password-protected or corrupted.', 400);
+      return;
+    }
+  }
+
   // ── Upload original to Cloudinary ─────────────────────────────────────────
-  const baseName = path.parse(originalname).name.replace(/\s+/g, '_');
-  const filename = `${baseName}_${uuidv4()}`;
+  // The extension is part of the public_id for raw files, so the delivery URL
+  // ends in .pdf / .epub (readers and CDNs rely on that).
+  const baseName = path.parse(originalname).name.replace(/[^\w.-]+/g, '_').slice(0, 80) || 'book';
+  const filename = `${baseName}_${uuidv4()}.${originalFormat}`;
 
   let uploadResult: { url: string; publicId: string };
   try {
@@ -106,36 +170,27 @@ export const uploadFile = asyncHandler(async (req: Request, res: Response) => {
     return;
   }
 
-  // ── Create Book document ──────────────────────────────────────────────────
-  const book = await Book.create({
-    userId,
-    title: baseName.replace(/_/g, ' '),
-    originalFileUrl: uploadResult.url,
-    originalFilePublicId: uploadResult.publicId,
-    originalFormat,
-    fileSize: size,
-    status: 'queued',
-    source: 'upload',
-  });
+  const title = path.parse(originalname).name.replace(/[_]+/g, ' ').trim() || 'Untitled';
 
-  // ── EPUB: no conversion needed — mark ready immediately ───────────────────
-  // EPUBs are already in the format that the reader (epub.js) consumes.
-  // Sending them through Calibre is unnecessary and wastes queue resources.
-  // We store the original file as the "converted" file and skip the queue.
-  if (originalFormat === 'epub') {
-    const epubJobId = uuidv4();
-
-    // Update book: ready to read right now
-    await Book.findByIdAndUpdate(book._id, {
-      status: 'ready',
-      convertedFileUrl: uploadResult.url, // same URL — no conversion
+  // ── Native formats: ready immediately, no queue ───────────────────────────
+  if (!CONVERSION_ENABLED || originalFormat === 'epub') {
+    const book = await Book.create({
+      userId,
+      title,
+      originalFileUrl: uploadResult.url,
+      originalFilePublicId: uploadResult.publicId,
+      // Same file serves as the readable file — the app opens it natively.
+      convertedFileUrl: uploadResult.url,
       convertedFilePublicId: uploadResult.publicId,
+      originalFormat,
+      fileSize: size,
+      status: 'ready',
+      source: 'upload',
     });
 
-    // Create a completed job record for consistency
-    // (the mobile app polls this to know the book is ready)
+    const jobId = uuidv4();
     await Job.create({
-      jobId: epubJobId,
+      jobId,
       userId,
       bookId: book._id,
       status: 'completed',
@@ -150,19 +205,31 @@ export const uploadFile = asyncHandler(async (req: Request, res: Response) => {
       res,
       {
         bookId: book._id.toString(),
-        jobId: epubJobId,
+        jobId,
         status: 'ready',
-        message: 'EPUB imported. Ready to read!',
+        message: `${originalFormat.toUpperCase()} imported. Ready to read!`,
       },
-      'EPUB imported successfully.',
+      `${originalFormat.toUpperCase()} imported successfully.`,
       201,
     );
     return;
   }
 
-  // ── Other formats (PDF, DOCX, MOBI, TXT): queue for Calibre conversion ───
-  const tempJobId = uuidv4();
+  // ── Conversion path (CONVERSION_ENABLED=true): queue for Calibre ──────────
+  const { conversionQueue } = await import('../jobs/queue.js');
 
+  const book = await Book.create({
+    userId,
+    title,
+    originalFileUrl: uploadResult.url,
+    originalFilePublicId: uploadResult.publicId,
+    originalFormat,
+    fileSize: size,
+    status: 'queued',
+    source: 'upload',
+  });
+
+  const tempJobId = uuidv4();
   await Job.create({
     jobId: tempJobId,
     userId,
@@ -173,20 +240,15 @@ export const uploadFile = asyncHandler(async (req: Request, res: Response) => {
     originalFileUrl: uploadResult.url,
   });
 
-  // Dispatch to BullMQ. The worker downloads from Cloudinary URL directly.
-  // We never store the file buffer in Redis — keeps payloads tiny.
-  const jobPayload: ConversionJobData = {
+  const bullJob = await conversionQueue.add('convert', {
     bookId: book._id.toString(),
     jobId: tempJobId,
     userId,
     originalFileUrl: uploadResult.url,
     originalFilename: originalname,
     originalFormat,
-  };
+  });
 
-  const bullJob = await conversionQueue.add('convert', jobPayload);
-
-  // BullMQ generates its own internal ID. Sync it with our Job document.
   const finalJobId = bullJob.id ?? tempJobId;
   await Job.findOneAndUpdate({ jobId: tempJobId }, { jobId: finalJobId });
   book.jobId = finalJobId;

@@ -16,8 +16,7 @@ const CONCURRENCY = Number(process.env['MAX_CONVERSION_CONCURRENT'] ?? '2');
 // ── Processor ─────────────────────────────────────────────────────────────────
 
 const processConversion = async (job: Job<ConversionJobData>): Promise<void> => {
-  const { bookId, userId, originalFilename, originalFormat } = job.data;
-  const fileBuffer = (job.data as ConversionJobData & { fileBuffer: string }).fileBuffer;
+  const { bookId, userId, originalFilename, originalFormat, originalFileUrl } = job.data;
 
   const inputPath = path.join(TEMP_DIR, `${bookId}.${originalFormat}`);
   const outputPath = path.join(TEMP_DIR, `${bookId}.epub`);
@@ -32,9 +31,14 @@ const processConversion = async (job: Job<ConversionJobData>): Promise<void> => 
     // ── 2. Mark book converting ──────────────────────────────────────────────
     await Book.findByIdAndUpdate(bookId, { status: 'converting' });
 
-    // ── 3. Decode base64 buffer → write to temp file ─────────────────────────
-    const buffer = Buffer.from(fileBuffer, 'base64');
-    await fs.writeFile(inputPath, buffer);
+    // ── 3. Download original from Cloudinary → write to temp file ────────────
+    // (Previously this read a base64 `fileBuffer` that the controller stopped
+    // sending, so EVERY conversion threw "first argument must be of type string".)
+    const download = await fetch(originalFileUrl);
+    if (!download.ok) {
+      throw new Error(`Could not download original file (HTTP ${download.status}).`);
+    }
+    await fs.writeFile(inputPath, Buffer.from(await download.arrayBuffer()));
 
     // ── 4. Convert via Calibre ────────────────────────────────────────────────
     await calibreService.convertToEpub(inputPath, outputPath);

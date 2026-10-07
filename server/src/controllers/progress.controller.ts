@@ -4,6 +4,8 @@ import { z } from 'zod'
 import mongoose from 'mongoose'
 
 import { Progress } from '../models/progress.model.js'
+import { Book } from '../models/book.model.js'
+import { Annotation } from '../models/annotation.model.js'
 import { successResponse, errorResponse } from '../utils/response.utils.js'
 
 const saveProgressSchema = z.object({
@@ -116,7 +118,9 @@ export const getReadingStats = asyncHandler(
 
     const { userId } = req.user
 
-    const [booksCompleted, booksInProgress, allProgress] = await Promise.all([
+    const [totalBooks, annotationCount, booksCompleted, booksInProgress, allProgress] = await Promise.all([
+      Book.countDocuments({ userId, status: 'ready' }),
+      Annotation.countDocuments({ userId }),
       Progress.countDocuments({ userId, isCompleted: true }),
       Progress.countDocuments({
         userId,
@@ -139,7 +143,19 @@ export const getReadingStats = asyncHandler(
 
     const currentStreak = calculateStreak(allProgress.map((p) => p.lastReadAt))
 
+    // The mobile Profile screen reads totalBooks / completedBooks /
+    // averageCompletionRate / annotationCount. The original keys are kept so
+    // nothing else breaks.
+    const avgAgg = await Progress.aggregate<{ avg: number }>([
+      { $match: { userId: new mongoose.Types.ObjectId(userId) } },
+      { $group: { _id: null, avg: { $avg: '$percentage' } } },
+    ])
+
     successResponse(res, {
+      totalBooks,
+      completedBooks: booksCompleted,
+      averageCompletionRate: Math.round(avgAgg[0]?.avg ?? 0),
+      annotationCount,
       booksCompleted,
       booksInProgress,
       totalReadingTimeSeconds,

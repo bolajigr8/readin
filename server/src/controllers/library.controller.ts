@@ -40,7 +40,7 @@ export const getLibrary = asyncHandler(async (req: Request, res: Response) => {
   const [books, total] = await Promise.all([
     Book.find({ userId, status: 'ready' })
       .select(
-        'title author coverUrl convertedFileUrl status source language genre fileSize jobId createdAt updatedAt',
+        'title author description coverUrl originalFileUrl convertedFileUrl originalFormat status source gutenbergId language genre fileSize jobId createdAt updatedAt',
       )
       .sort({ updatedAt: -1 })
       .skip(skip)
@@ -138,14 +138,23 @@ export const deleteBook = asyncHandler(async (req: Request, res: Response) => {
     return
   }
 
-  // Delete EPUB from Cloudinary (only user-uploaded books have a publicId)
-  if (book.convertedFilePublicId) {
-    await cloudinaryService
-      .deleteFile(book.convertedFilePublicId)
-      .catch((err: unknown) => {
-        console.warn('[library] Could not delete EPUB from Cloudinary:', err)
-      })
-  }
+  // Delete the stored file(s) from Cloudinary. Uploaded books keep the SAME
+  // file as original + converted while conversion is on hold, so de-duplicate
+  // the public ids. Discover books have no Cloudinary files at all.
+  const publicIds = [
+    ...new Set(
+      [book.convertedFilePublicId, book.originalFilePublicId].filter(
+        (id): id is string => typeof id === 'string' && id.length > 0,
+      ),
+    ),
+  ]
+  await Promise.all(
+    publicIds.map((id) =>
+      cloudinaryService.deleteFile(id).catch((err: unknown) => {
+        console.warn('[library] Could not delete file from Cloudinary:', id, err)
+      }),
+    ),
+  )
 
   // Delete all associated data in parallel
   await Promise.all([
