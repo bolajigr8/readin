@@ -5,19 +5,15 @@ import path from 'path'
 // Phones frequently send "application/octet-stream" (or an empty type) for
 // .epub/.pdf picked from the Files app. We accept those and let the controller
 // decide the real format from the extension + magic bytes.
-const ALLOWED_MIME_TYPES = new Set([
-  'application/pdf',
-  'application/epub+zip',
-  'application/x-mobipocket-ebook',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'text/plain',
-  'application/octet-stream',
-  'application/zip',
-  'binary/octet-stream',
-  '',
+// The file EXTENSION decides (phones send application/octet-stream or an empty
+// type for most files). Every format the app can open is accepted.
+const ALLOWED_EXTENSIONS = new Set([
+  '.pdf', '.epub', '.mobi', '.azw3', '.fb2', '.cbz', '.cbr',
+  '.docx', '.doc', '.odt', '.rtf',
+  '.xlsx', '.xls', '.csv',
+  '.pptx', '.ppt',
+  '.txt', '.md', '.html', '.htm',
 ])
-
-const ALLOWED_EXTENSIONS = new Set(['.pdf', '.epub', '.mobi', '.docx', '.txt'])
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100 MB
 
@@ -29,10 +25,10 @@ const fileFilter = (
   cb: FileFilterCallback,
 ): void => {
   const ext = path.extname(file.originalname).toLowerCase()
-  if (ALLOWED_MIME_TYPES.has(file.mimetype) && ALLOWED_EXTENSIONS.has(ext)) {
+  if (ALLOWED_EXTENSIONS.has(ext)) {
     cb(null, true)
   } else {
-    cb(new Error('Unsupported file type. Allowed: PDF and EPUB'))
+    cb(new Error('Unsupported file type.'))
   }
 }
 

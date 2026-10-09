@@ -1,0 +1,19 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+
+linter:
+  rules:
+    avoid_print: true
+    prefer_const_constructors: true
+    prefer_const_declarations: true
+    # `_x = x` initialisers keep named parameters public while fields stay
+    # private — intentional, so the suggested rewrite is disabled.
+    prefer_initializing_formals: false
+    # Classic `if (x != null) 'k': x` is kept on purpose (works on every Dart
+    # front-end version); the null-aware element syntax is not used.
+    use_null_aware_elements: false

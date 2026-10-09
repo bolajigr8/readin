@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);font-family:-apple-system,Roboto,'Segoe UI',sans-serif;
+    font-size:var(--fs);line-height:1.65;word-wrap:break-word;overflow-wrap:anywhere}
+  :root{--bg:#0A0A0A;--fg:#E4E4E7;--muted:#A1A1AA;--line:#2A2A2A;--card:#141414;--accent:#FB923C;--fs:17px}
+  body.light{--bg:#FFFFFF;--fg:#1A1A1A;--muted:#6B6B6B;--line:#DDDDDD;--card:#F4F4F5}
+  body.sepia{--bg:#F5E6C8;--fg:#3D2B1F;--muted:#7A5F4B;--line:#D9C6A0;--card:#EBD9B4}
+  #root{max-width:780px;margin:0 auto;padding:16px 16px 96px}
+  h1,h2,h3,h4,h5,h6{line-height:1.25;margin:1.2em 0 .5em}
+  h1{font-size:1.7em}h2{font-size:1.4em}h3{font-size:1.2em}
+  p{margin:.7em 0}
+  a{color:var(--accent)}
+  img{max-width:100%;height:auto}
+  pre{background:var(--card);padding:12px;border-radius:8px;overflow-x:auto;font-size:.85em}
+  code{background:var(--card);padding:1px 5px;border-radius:4px;font-family:ui-monospace,Menlo,monospace;font-size:.9em}
+  pre code{background:none;padding:0}
+  blockquote{margin:1em 0;padding:.2em 1em;border-left:3px solid var(--accent);color:var(--muted)}
+  hr{border:0;border-top:1px solid var(--line);margin:1.5em 0}
+  .scroll{overflow-x:auto;margin:1em 0;border:1px solid var(--line);border-radius:8px}
+  table{border-collapse:collapse;min-width:100%;font-size:.9em}
+  th,td{border:1px solid var(--line);padding:6px 10px;text-align:left;vertical-align:top;white-space:pre-wrap}
+  thead th,tr:first-child th{background:var(--card);position:sticky;top:0}
+  .tabs{display:flex;gap:8px;overflow-x:auto;margin:0 0 12px;padding-bottom:4px}
+  .tab{flex:0 0 auto;padding:6px 14px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--muted);font-size:.85em}
+  .tab.on{border-color:var(--accent);color:var(--accent)}
+  .slide{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:16px 0}
+  .slide .n{font-size:.75em;color:var(--muted);margin-bottom:6px}
+  .slide h2{margin:.2em 0 .5em}
+  .note{color:var(--muted);font-size:.85em;margin:8px 0}
+  .page{display:block;width:100%;min-height:240px;background:var(--card);margin:0 0 4px}
+  .err{padding:32px 8px;text-align:center;color:var(--muted)}
+  ul,ol{padding-left:1.4em}
+  .docx-li{margin:.3em 0;padding-left:1.4em;text-indent:-1.4em}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="jszip.min.js"></script>
+<script src="viewer_core.js"></script>
+<script>
+(function () {
+  var CFG = __READIN_CONFIG__;
+  var core = ReadInViewerCore;
+  var root = document.getElementById('root');
+  var esc = core.escapeHtml;
+
+  function post(o) { try { ReadIn.postMessage(JSON.stringify(o)); } catch (e) {} }
+  window.onerror = function (m) { post({ type: 'ERROR', message: String(m) }); };
+
+  // ── style (theme / font size) driven from Dart ─────────────────────────────
+  window.viewerApi = {
+    setStyle: function (json) {
+      try {
+        var p = JSON.parse(json);
+        document.body.className = p.theme === 'light' ? 'light' : p.theme === 'sepia' ? 'sepia' : '';
+        document.documentElement.style.setProperty('--fs', (p.fontSize || 17) + 'px');
+      } catch (e) {}
+    }
+  };
+  viewerApi.setStyle(JSON.stringify(CFG));
+
+  // ── helpers ───────────────────────────────────────────────────────────────
+  function parseXml(str) {
+    var d = new DOMParser().parseFromString(str, 'application/xml');
+    if (d.getElementsByTagName('parsererror').length) throw new Error('This file could not be read (invalid XML).');
+    return d;
+  }
+  function kids(el, name) {
+    var out = [];
+    if (!el) return out;
+    for (var i = 0; i < el.children.length; i++) if (el.children[i].localName === name) out.push(el.children[i]);
+    return out;
+  }
+  function kid(el, name) { return kids(el, name)[0] || null; }
+  function attr(el, name) {
+    if (!el) return null;
+    var a = el.getAttribute(name);
+    if (a != null) return a;
+    for (var i = 0; i < el.attributes.length; i++) if (el.attributes[i].localName === name) return el.attributes[i].value;
+    return null;
+  }
+  function text(el) { return el ? el.textContent : ''; }
+  function utf8(buf) {
+    try { return new TextDecoder('utf-8', { fatal: true }).decode(buf); }
+    catch (e) { return new TextDecoder('windows-1252').decode(buf); }
+  }
+  function readText(zip, path) {
+    var f = zip.file(path);
+    return f ? f.async('string') : Promise.resolve(null);
+  }
+  function mimeOf(name) {
+    var e = (name.split('.').pop() || '').toLowerCase();
+    return { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp', svg: 'image/svg+xml' }[e] || 'application/octet-stream';
+  }
+  function blobUrl(zip, path) {
+    var f = zip.file(path);
+    if (!f) return Promise.resolve(null);
+    return f.async('arraybuffer').then(function (b) {
+      return URL.createObjectURL(new Blob([b], { type: mimeOf(path) }));
+    });
+  }
+  function show(html) { root.innerHTML = html; }
+
+  // ── plain text, markdown, html, csv ──────────────────────────────────────
+  function renderText(buf) { show(core.textToHtml(utf8(buf))); }
+  function renderMarkdown(buf) { show(core.markdownToHtml(utf8(buf))); }
+
+  function renderHtml(buf) {
+    var doc = new DOMParser().parseFromString(utf8(buf), 'text/html');
+    var bad = doc.querySelectorAll('script,iframe,object,embed,link,meta,base,form');
+    for (var i = 0; i < bad.length; i++) bad[i].remove();
+    var all = doc.body.querySelectorAll('*');
+    for (var j = 0; j < all.length; j++) {
+      var el = all[j];
+      for (var k = el.attributes.length - 1; k >= 0; k--) {
+        var n = el.attributes[k].name.toLowerCase(), v = el.attributes[k].value || '';
+        if (n.indexOf('on') === 0 || /^\s*javascript:/i.test(v) || n === 'style') el.removeAttribute(el.attributes[k].name);
+      }
+      if (el.tagName === 'IMG' && !/^data:image\//i.test(el.getAttribute('src') || '')) el.removeAttribute('src');
+    }
+    show(doc.body.innerHTML);
+  }
+
+  function table(rows, headerFirst) {
+    var h = '<div class="scroll"><table>';
+    for (var r = 0; r < rows.length; r++) {
+      h += '<tr>';
+      for (var c = 0; c < rows[r].length; c++) {
+        var tag = headerFirst && r === 0 ? 'th' : 'td';
+        h += '<' + tag + '>' + esc(rows[r][c] == null ? '' : rows[r][c]) + '</' + tag + '>';
+      }
+      h += '</tr>';
+    }
+    return h + '</table></div>';
+  }
+
+  function renderCsv(buf) {
+    var res = core.parseCsv(utf8(buf), 5000);
+    show((res.truncated ? '<p class="note">Showing the first 5,000 rows.</p>' : '') + table(res.rows, true));
+  }
+
+  // ── Word (.docx) ──────────────────────────────────────────────────────────
+  function renderDocx(buf) {
+    return JSZip.loadAsync(buf).then(function (zip) {
+      return Promise.all([
+        readText(zip, 'word/document.xml'),
+        readText(zip, 'word/_rels/document.xml.rels'),
+        readText(zip, 'word/numbering.xml')
+      ]).then(function (parts) {
+        if (!parts[0]) throw new Error('This is not a valid Word document.');
+        var doc = parseXml(parts[0]);
+        var rels = {};
+        if (parts[1]) {
+          var rd = parseXml(parts[1]).getElementsByTagName('Relationship');
+          for (var i = 0; i < rd.length; i++) rels[rd[i].getAttribute('Id')] = rd[i].getAttribute('Target');
+        }
+        var numFmt = {};
+        if (parts[2]) {
+          var nd = parseXml(parts[2]);
+          var abs = {};
+          var aList = nd.getElementsByTagName('*');
+          for (var a = 0; a < aList.length; a++) {
+            if (aList[a].localName === 'abstractNum') {
+              var id = attr(aList[a], 'abstractNumId');
+              var lv = kids(aList[a], 'lvl')[0];
+              abs[id] = lv ? attr(kid(lv, 'numFmt'), 'val') : 'bullet';
+            }
+          }
+          for (var b = 0; b < aList.length; b++) {
+            if (aList[b].localName === 'num') {
+              numFmt[attr(aList[b], 'numId')] = abs[attr(kid(aList[b], 'abstractNumId'), 'val')] || 'bullet';
+            }
+          }
+        }
+
+        var imageJobs = [];
+        var counters = {};
+
+        function runHtml(r) {
+          var rpr = kid(r, 'rPr');
+          var t = '';
+          for (var i = 0; i < r.children.length; i++) {
+            var c = r.children[i];
+            if (c.localName === 't') t += esc(c.textContent);
+            else if (c.localName === 'tab') t += '&emsp;';
+            else if (c.localName === 'br') t += '<br>';
+            else if (c.localName === 'drawing' || c.localName === 'pict') {
+              var blips = c.getElementsByTagName('*');
+              for (var k = 0; k < blips.length; k++) {
+                if (blips[k].localName === 'blip') {
+                  var rid = attr(blips[k], 'embed');
+                  var target = rels[rid];
+                  if (target) {
+                    var token = 'img' + imageJobs.length;
+                    imageJobs.push({ token: token, path: 'word/' + target.replace(/^\//, '').replace(/^word\//, '') });
+                    t += '<img data-tok="' + token + '" alt="">';
+                  }
+                  break;
+                }
+              }
+            }
+          }
+          if (!t) return '';
+          if (rpr) {
+            if (kid(rpr, 'b') && attr(kid(rpr, 'b'), 'val') !== '0') t = '<strong>' + t + '</strong>';
+            if (kid(rpr, 'i') && attr(kid(rpr, 'i'), 'val') !== '0') t = '<em>' + t + '</em>';
+            if (kid(rpr, 'u') && attr(kid(rpr, 'u'), 'val') !== 'none') t = '<u>' + t + '</u>';
+            if (kid(rpr, 'strike')) t = '<del>' + t + '</del>';
+          }
+          return t;
+        }
+
+        function inlineHtml(p) {
+          var h = '';
+          for (var i = 0; i < p.children.length; i++) {
+            var c = p.children[i];
+            if (c.localName === 'r') h += runHtml(c);
+            else if (c.localName === 'hyperlink') {
+              var rs = kids(c, 'r');
+              for (var j = 0; j < rs.length; j++) h += runHtml(rs[j]);
+            }
+          }
+          return h;
+        }
+
+        function para(p) {
+          var ppr = kid(p, 'pPr');
+          var style = ppr ? attr(kid(ppr, 'pStyle'), 'val') || '' : '';
+          var inner = inlineHtml(p);
+          if (!inner) return '<p>&nbsp;</p>';
+          var hm = /^(?:Heading|heading)\s*([1-6])$/.exec(style);
+          if (hm) return '<h' + hm[1] + '>' + inner + '</h' + hm[1] + '>';
+          if (/^Title$/i.test(style)) return '<h1>' + inner + '</h1>';
+          if (/^Subtitle$/i.test(style)) return '<h2>' + inner + '</h2>';
+          var np = ppr ? kid(ppr, 'numPr') : null;
+          if (np) {
+            var nid = attr(kid(np, 'numId'), 'val');
+            var lvl = attr(kid(np, 'ilvl'), 'val') || '0';
+            var fmt = numFmt[nid] || 'bullet';
+            var label = '•';
+            if (fmt !== 'bullet') {
+              counters[nid + ':' + lvl] = (counters[nid + ':' + lvl] || 0) + 1;
+              label = counters[nid + ':' + lvl] + '.';
+            }
+            return '<div class="docx-li" style="margin-left:' + (parseInt(lvl, 10) * 1.2) + 'em">' + label + '&nbsp;' + inner + '</div>';
+          }
+          return '<p>' + inner + '</p>';
+        }
+
+        function block(el) {
+          if (el.localName === 'p') return para(el);
+          if (el.localName === 'tbl') {
+            var h = '<div class="scroll"><table>';
+            kids(el, 'tr').forEach(function (tr) {
+              h += '<tr>';
+              kids(tr, 'tc').forEach(function (tc) {
+                var cell = '';
+                for (var i = 0; i < tc.children.length; i++) cell += block(tc.children[i]);
+                h += '<td>' + cell + '</td>';
+              });
+              h += '</tr>';
+            });
+            return h + '</table></div>';
+          }
+          return '';
+        }
+
+        var body = kid(doc.documentElement, 'body');
+        var html = '';
+        if (body) for (var n = 0; n < body.children.length; n++) html += block(body.children[n]);
+        show(html || '<p class="err">This document is empty.</p>');
+
+        // Images last (so text shows immediately).
+        imageJobs.forEach(function (job) {
+          blobUrl(zip, job.path).then(function (u) {
+            var img = root.querySelector('img[data-tok="' + job.token + '"]');
+            if (img && u) img.src = u; else if (img) img.remove();
+          });
+        });
+      });
+    });
+  }
+
+  // ── OpenDocument text (.odt) ──────────────────────────────────────────────
+  function renderOdt(buf) {
+    return JSZip.loadAsync(buf).then(function (zip) {
+      return readText(zip, 'content.xml').then(function (xml) {
+        if (!xml) throw new Error('This is not a valid OpenDocument file.');
+        var doc = parseXml(xml);
+        var body = doc.getElementsByTagName('*');
+        var textEl = null;
+        for (var i = 0; i < body.length; i++) if (body[i].localName === 'text' && body[i].parentNode.localName === 'body') textEl = body[i];
+        function inline(el) {
+          var h = '';
+          for (var i = 0; i < el.childNodes.length; i++) {
+            var n = el.childNodes[i];
+            if (n.nodeType === 3) h += esc(n.nodeValue);
+            else if (n.localName === 'span' || n.localName === 'a') h += inline(n);
+            else if (n.localName === 's') h += '&nbsp;';
+            else if (n.localName === 'tab') h += '&emsp;';
+            else if (n.localName === 'line-break') h += '<br>';
+          }
+          return h;
+        }
+        function blockOf(el) {
+          var ln = el.localName;
+          if (ln === 'h') { var lv = Math.min(6, parseInt(attr(el, 'outline-level') || '1', 10) || 1); return '<h' + lv + '>' + inline(el) + '</h' + lv + '>'; }
+          if (ln === 'p') { var t = inline(el); return t ? '<p>' + t + '</p>' : ''; }
+          if (ln === 'list') return '<ul>' + kids(el, 'list-item').map(function (li) { return '<li>' + Array.prototype.map.call(li.children, blockOf).join('') + '</li>'; }).join('') + '</ul>';
+          if (ln === 'table') {
+            var h = '<div class="scroll"><table>';
+            kids(el, 'table-row').forEach(function (tr) {
+              h += '<tr>' + kids(tr, 'table-cell').map(function (tc) { return '<td>' + Array.prototype.map.call(tc.children, blockOf).join('') + '</td>'; }).join('') + '</tr>';
+            });
+            return h + '</table></div>';
+          }
+          return '';
+        }
+        var html = '';
+        if (textEl) for (var k = 0; k < textEl.children.length; k++) html += blockOf(textEl.children[k]);
+        show(html || '<p class="err">This document is empty.</p>');
+      });
+    });
+  }
+
+  // ── Excel (.xlsx) ─────────────────────────────────────────────────────────
+  function renderXlsx(buf) {
+    return JSZip.loadAsync(buf).then(function (zip) {
+      return Promise.all([
+        readText(zip, 'xl/workbook.xml'),
+        readText(zip, 'xl/_rels/workbook.xml.rels'),
+        readText(zip, 'xl/sharedStrings.xml')
+      ]).then(function (parts) {
+        if (!parts[0]) throw new Error('This is not a valid Excel workbook.');
+        var wb = parseXml(parts[0]);
+        var rels = {};
+        if (parts[1]) {
+          var rl = parseXml(parts[1]).getElementsByTagName('Relationship');
+          for (var i = 0; i < rl.length; i++) rels[rl[i].getAttribute('Id')] = rl[i].getAttribute('Target');
+        }
+        var shared = [];
+        if (parts[2]) {
+          var sd = parseXml(parts[2]).getElementsByTagName('*');
+          for (var s = 0; s < sd.length; s++) {
+            if (sd[s].localName === 'si') {
+              var tt = '';
+              var ts = sd[s].getElementsByTagName('*');
+              for (var q = 0; q < ts.length; q++) if (ts[q].localName === 't') tt += ts[q].textContent;
+              shared.push(tt);
+            }
+          }
+        }
+        var sheets = [];
+        var all = wb.getElementsByTagName('*');
+        for (var w = 0; w < all.length; w++) {
+          if (all[w].localName === 'sheet') {
+            var rid = attr(all[w], 'id');
+            var target = rels[rid] || '';
+            target = target.replace(/^\//, '');
+            sheets.push({ name: all[w].getAttribute('name') || 'Sheet', path: target.indexOf('xl/') === 0 ? target : 'xl/' + target });
+          }
+        }
+        if (!sheets.length) throw new Error('This workbook has no sheets.');
+
+        var cache = {};
+        function sheetRows(sh) {
+          if (cache[sh.path]) return Promise.resolve(cache[sh.path]);
+          return readText(zip, sh.path).then(function (x) {
+            if (!x) return [];
+            var d = parseXml(x);
+            var rows = [];
+            var rs = d.getElementsByTagName('*');
+            for (var r = 0; r < rs.length && rows.length < 2000; r++) {
+              if (rs[r].localName !== 'row') continue;
+              var row = [];
+              kids(rs[r], 'c').forEach(function (c) {
+                var ci = core.colIndex(c.getAttribute('r') || '');
+                if (ci > 60) return;
+                var t = c.getAttribute('t');
+                var v = kid(c, 'v');
+                var val = '';
+                if (t === 's') val = shared[parseInt(text(v), 10)] || '';
+                else if (t === 'inlineStr') val = text(kid(c, 'is'));
+                else if (t === 'b') val = text(v) === '1' ? 'TRUE' : 'FALSE';
+                else val = text(v);
+                while (row.length < ci) row.push('');
+                row[ci] = val;
+              });
+              rows.push(row);
+            }
+            cache[sh.path] = rows;
+            return rows;
+          });
+        }
+
+        function draw(idx) {
+          var tabs = '<div class="tabs">' + sheets.map(function (sh, i) {
+            return '<div class="tab' + (i === idx ? ' on' : '') + '" data-i="' + i + '">' + esc(sh.name) + '</div>';
+          }).join('') + '</div>';
+          show(tabs + '<p class="note">Loading…</p>');
+          bindTabs();
+          sheetRows(sheets[idx]).then(function (rows) {
+            show(tabs + (rows.length ? table(rows, false) : '<p class="note">This sheet is empty.</p>') +
+              (rows.length >= 2000 ? '<p class="note">Showing the first 2,000 rows.</p>' : ''));
+            bindTabs();
+          });
+        }
+        function bindTabs() {
+          var els = root.querySelectorAll('.tab');
+          for (var i = 0; i < els.length; i++) {
+            els[i].onclick = function () { draw(parseInt(this.getAttribute('data-i'), 10)); };
+          }
+        }
+        draw(0);
+      });
+    });
+  }
+
+  // ── PowerPoint (.pptx): text of every slide ───────────────────────────────
+  function renderPptx(buf) {
+    return JSZip.loadAsync(buf).then(function (zip) {
+      var names = Object.keys(zip.files).filter(function (n) { return /^ppt\/slides\/slide\d+\.xml$/.test(n); });
+      names.sort(core.naturalCompare);
+      if (!names.length) throw new Error('This is not a valid PowerPoint file.');
+      return Promise.all(names.map(function (n) { return readText(zip, n); })).then(function (xmls) {
+        var html = '<p class="note">Text of the slides (pictures and animations are not shown).</p>';
+        xmls.forEach(function (x, i) {
+          var d = parseXml(x);
+          var title = '', body = [];
+          var sps = d.getElementsByTagName('*');
+          for (var s = 0; s < sps.length; s++) {
+            if (sps[s].localName !== 'sp') continue;
+            var ph = sps[s].getElementsByTagName('*');
+            var isTitle = false;
+            for (var k = 0; k < ph.length; k++) if (ph[k].localName === 'ph' && /title|ctrTitle/i.test(ph[k].getAttribute('type') || '')) isTitle = true;
+            var paras = [];
+            for (var p = 0; p < ph.length; p++) {
+              if (ph[p].localName !== 'p') continue;
+              var t = '';
+              var runs = ph[p].getElementsByTagName('*');
+              for (var r = 0; r < runs.length; r++) if (runs[r].localName === 't') t += runs[r].textContent;
+              if (t.trim()) paras.push(t.trim());
+            }
+            if (isTitle && !title) title = paras.join(' ');
+            else body = body.concat(paras);
+          }
+          html += '<div class="slide"><div class="n">Slide ' + (i + 1) + '</div>' +
+            (title ? '<h2>' + esc(title) + '</h2>' : '') +
+            body.map(function (t) { return '<p>' + esc(t) + '</p>'; }).join('') + '</div>';
+        });
+        show(html);
+      });
+    });
+  }
+
+  // ── FictionBook (.fb2) ────────────────────────────────────────────────────
+  function renderFb2(buf) {
+    var d = parseXml(utf8(buf));
+    function inline(el) {
+      var h = '';
+      for (var i = 0; i < el.childNodes.length; i++) {
+        var n = el.childNodes[i];
+        if (n.nodeType === 3) h += esc(n.nodeValue);
+        else if (n.localName === 'emphasis') h += '<em>' + inline(n) + '</em>';
+        else if (n.localName === 'strong') h += '<strong>' + inline(n) + '</strong>';
+        else if (n.localName === 'a') h += inline(n);
+      }
+      return h;
+    }
+    function section(el, depth) {
+      var h = '';
+      for (var i = 0; i < el.children.length; i++) {
+        var c = el.children[i];
+        if (c.localName === 'title') h += '<h' + Math.min(depth + 1, 4) + '>' + Array.prototype.map.call(c.children, inline).join(' ') + '</h' + Math.min(depth + 1, 4) + '>';
+        else if (c.localName === 'p') h += '<p>' + inline(c) + '</p>';
+        else if (c.localName === 'empty-line') h += '<br>';
+        else if (c.localName === 'subtitle') h += '<h4>' + inline(c) + '</h4>';
+        else if (c.localName === 'epigraph' || c.localName === 'cite') h += '<blockquote>' + section(c, depth) + '</blockquote>';
+        else if (c.localName === 'section') h += section(c, depth + 1);
+      }
+      return h;
+    }
+    var title = '';
+    var all = d.getElementsByTagName('*');
+    for (var i = 0; i < all.length; i++) if (all[i].localName === 'book-title') { title = all[i].textContent; break; }
+    var html = title ? '<h1>' + esc(title) + '</h1>' : '';
+    for (var b = 0; b < all.length; b++) if (all[b].localName === 'body') html += section(all[b], 1);
+    show(html || '<p class="err">This book is empty.</p>');
+  }
+
+  // ── Comics (.cbz): pages load lazily as you scroll ────────────────────────
+  function renderCbz(buf) {
+    return JSZip.loadAsync(buf).then(function (zip) {
+      var names = Object.keys(zip.files).filter(function (n) { return !zip.files[n].dir && /\.(jpe?g|png|gif|webp|bmp)$/i.test(n); });
+      names.sort(core.naturalCompare);
+      if (!names.length) throw new Error('No pages found in this comic archive.');
+      root.style.maxWidth = '900px';
+      root.style.padding = '0 0 96px';
+      show(names.map(function (n, i) { return '<img class="page" data-i="' + i + '" alt="Page ' + (i + 1) + '">'; }).join(''));
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (!e.isIntersecting) return;
+          var img = e.target;
+          io.unobserve(img);
+          blobUrl(zip, names[parseInt(img.getAttribute('data-i'), 10)]).then(function (u) {
+            if (u) { img.src = u; img.style.minHeight = '0'; }
+          });
+        });
+      }, { rootMargin: '1200px 0px' });
+      var pages = root.querySelectorAll('img.page');
+      for (var i = 0; i < pages.length; i++) io.observe(pages[i]);
+    });
+  }
+
+  // ── boot ──────────────────────────────────────────────────────────────────
+  var RENDER = {
+    txt: renderText, md: renderMarkdown, html: renderHtml, htm: renderHtml, csv: renderCsv,
+    docx: renderDocx, odt: renderOdt, xlsx: renderXlsx, pptx: renderPptx, fb2: renderFb2, cbz: renderCbz
+  };
+
+  fetch(CFG.bookUrl)
+    .then(function (r) {
+      if (!r.ok) throw new Error('The file could not be loaded (HTTP ' + r.status + ').');
+      return r.arrayBuffer();
+    })
+    .then(function (buf) {
+      var fn = RENDER[CFG.format];
+      if (!fn) throw new Error('This format is not supported in the viewer.');
+      return fn(buf);
+    })
+    .then(function () { post({ type: 'READY' }); })
+    .catch(function (e) {
+      show('<div class="err">' + esc((e && e.message) || e) + '</div>');
+      post({ type: 'ERROR', message: String((e && e.message) || e) });
+    });
+})();
+</script>
+</body>
+</html>

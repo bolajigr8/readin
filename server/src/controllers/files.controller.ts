@@ -28,29 +28,30 @@ const MIME_TO_FORMAT: Record<string, OriginalFormat> = {
   'application/epub+zip': 'epub',
   'application/x-mobipocket-ebook': 'mobi',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
   'text/plain': 'txt',
 };
 
 const EXT_TO_FORMAT: Record<string, OriginalFormat> = {
-  '.pdf': 'pdf',
-  '.epub': 'epub',
-  '.mobi': 'mobi',
-  '.docx': 'docx',
-  '.txt': 'txt',
+  '.pdf': 'pdf', '.epub': 'epub', '.mobi': 'mobi', '.azw3': 'azw3', '.fb2': 'fb2',
+  '.cbz': 'cbz', '.cbr': 'cbr', '.docx': 'docx', '.doc': 'doc', '.odt': 'odt',
+  '.rtf': 'rtf', '.xlsx': 'xlsx', '.xls': 'xls', '.csv': 'csv', '.pptx': 'pptx',
+  '.ppt': 'ppt', '.txt': 'txt', '.md': 'md', '.html': 'html', '.htm': 'htm',
 };
 
 const resolveFormat = (mimetype: string, originalname: string): OriginalFormat | null => {
   const ext = path.extname(originalname).toLowerCase();
-  const byExt = EXT_TO_FORMAT[ext];
-  const byMime = MIME_TO_FORMAT[mimetype];
-  // Extension wins when the mimetype is generic/unknown.
-  return byMime ?? byExt ?? null;
+  // The extension wins: phones send generic MIME types for most files.
+  return EXT_TO_FORMAT[ext] ?? MIME_TO_FORMAT[mimetype] ?? null;
 };
+
+const ZIP_FORMATS = new Set<OriginalFormat>(['epub', 'docx', 'xlsx', 'pptx', 'odt', 'cbz']);
 
 /** Cheap content sniffing so a renamed/corrupt file is rejected up-front. */
 const looksLikeFormat = (buf: Buffer, format: OriginalFormat): boolean => {
   if (format === 'pdf') return buf.subarray(0, 5).toString('latin1') === '%PDF-';
-  if (format === 'epub') return buf.length > 4 && buf[0] === 0x50 && buf[1] === 0x4b; // "PK" zip
+  if (ZIP_FORMATS.has(format)) return buf.length > 4 && buf[0] === 0x50 && buf[1] === 0x4b; // "PK" zip
   return true;
 };
 
@@ -97,17 +98,7 @@ export const uploadFile = asyncHandler(async (req: Request, res: Response) => {
   // ── Validate format ───────────────────────────────────────────────────────
   const originalFormat = resolveFormat(mimetype, originalname);
   if (!originalFormat) {
-    errorResponse(res, 'Unsupported file type. Accepted formats: PDF and EPUB.', 400);
-    return;
-  }
-
-  // While conversion is on hold only natively-readable formats are accepted.
-  if (!CONVERSION_ENABLED && originalFormat !== 'pdf' && originalFormat !== 'epub') {
-    errorResponse(
-      res,
-      `${originalFormat.toUpperCase()} import is paused for now. Please import a PDF or EPUB file.`,
-      400,
-    );
+    errorResponse(res, 'Unsupported file type.', 400);
     return;
   }
 
@@ -174,6 +165,7 @@ export const uploadFile = asyncHandler(async (req: Request, res: Response) => {
 
   // ── Native formats: ready immediately, no queue ───────────────────────────
   if (!CONVERSION_ENABLED || originalFormat === 'epub') {
+    // Cloud backup of ANY supported format: stored as-is, readable on the phone.
     const book = await Book.create({
       userId,
       title,

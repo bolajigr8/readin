@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Lets MainActivity share / open files that live in the app's private storage
+     (books, quote-card images) through a content:// URI. -->
+<paths>
+    <root-path name="root" path="." />
+</paths>

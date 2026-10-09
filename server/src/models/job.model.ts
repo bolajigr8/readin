@@ -1,7 +1,8 @@
 import mongoose, { type Document, Schema, type Types } from 'mongoose';
 
 export type JobStatus = 'waiting' | 'active' | 'completed' | 'failed';
-export type OriginalFormat = 'pdf' | 'epub' | 'mobi' | 'docx' | 'txt';
+import { ALL_FORMATS, type OriginalFormat } from './book.model.js';
+export type { OriginalFormat };
 
 export interface IJob extends Document {
   _id: Types.ObjectId;
@@ -68,7 +69,7 @@ const jobSchema = new Schema<IJob>(
     },
     originalFormat: {
       type: String,
-      enum: ['pdf', 'epub', 'mobi', 'docx', 'txt'] satisfies OriginalFormat[],
+      enum: [...ALL_FORMATS] satisfies OriginalFormat[],
       required: true,
     },
     originalFileUrl: {

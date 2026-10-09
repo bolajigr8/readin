@@ -7,8 +7,19 @@ export type BookStatus =
   | 'ready'
   | 'failed'
 
-export type OriginalFormat = 'pdf' | 'epub' | 'mobi' | 'docx' | 'txt'
-export type BookSource = 'upload' | 'discover'
+// Every format the app can open on the phone (local-first). The server only
+// stores the NAME of the format, so adding one never needs a server change.
+export const ALL_FORMATS = [
+  'pdf', 'epub', 'mobi', 'azw3', 'fb2', 'cbz', 'cbr',
+  'docx', 'doc', 'odt', 'rtf',
+  'xlsx', 'xls', 'csv',
+  'pptx', 'ppt',
+  'txt', 'md', 'html', 'htm',
+  'other',
+] as const
+
+export type OriginalFormat = (typeof ALL_FORMATS)[number]
+export type BookSource = 'upload' | 'discover' | 'local'
 
 export interface IBook extends Document {
   _id: Types.ObjectId
@@ -31,6 +42,8 @@ export interface IBook extends Document {
   gutenbergId: string | null
   language: string
   genre: string
+  /** SHA-1-style fingerprint of the file (local-first books): de-duplicates re-imports. */
+  fingerprint: string
   createdAt: Date
   updatedAt: Date
 }
@@ -79,7 +92,7 @@ const bookSchema = new Schema<IBook>(
     },
     originalFormat: {
       type: String,
-      enum: ['pdf', 'epub', 'mobi', 'docx', 'txt'] satisfies OriginalFormat[],
+      enum: [...ALL_FORMATS] satisfies OriginalFormat[],
       required: true,
     },
     fileSize: {
@@ -111,7 +124,7 @@ const bookSchema = new Schema<IBook>(
     },
     source: {
       type: String,
-      enum: ['upload', 'discover'] satisfies BookSource[],
+      enum: ['upload', 'discover', 'local'] satisfies BookSource[],
       default: 'upload',
     },
     gutenbergId: {
@@ -125,6 +138,11 @@ const bookSchema = new Schema<IBook>(
     genre: {
       type: String,
       default: '',
+    },
+    fingerprint: {
+      type: String,
+      default: '',
+      index: true,
     },
   },
   {

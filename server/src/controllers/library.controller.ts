@@ -3,7 +3,7 @@ import asyncHandler from 'express-async-handler'
 import { z } from 'zod'
 import mongoose from 'mongoose'
 
-import { Book } from '../models/book.model.js'
+import { ALL_FORMATS, Book, type OriginalFormat } from '../models/book.model.js'
 import { Annotation } from '../models/annotation.model.js'
 import { Bookmark } from '../models/bookmark.model.js'
 import { Progress } from '../models/progress.model.js'
@@ -40,7 +40,7 @@ export const getLibrary = asyncHandler(async (req: Request, res: Response) => {
   const [books, total] = await Promise.all([
     Book.find({ userId, status: 'ready' })
       .select(
-        'title author description coverUrl originalFileUrl convertedFileUrl originalFormat status source gutenbergId language genre fileSize jobId createdAt updatedAt',
+        'title author description coverUrl originalFileUrl convertedFileUrl originalFormat status source gutenbergId language genre fileSize fingerprint jobId createdAt updatedAt',
       )
       .sort({ updatedAt: -1 })
       .skip(skip)
@@ -238,3 +238,70 @@ export const saveDiscoveredBook = asyncHandler(
     successResponse(res, { book }, 'Book saved to library.', 201)
   },
 )
+
+// ── registerLocalBook (local-first) ───────────────────────────────────────────
+// The FILE stays on the user's phone. The server only keeps a record (title,
+// format, size, fingerprint) so progress, highlights, notes and bookmarks sync
+// and the book shows up on every device of the user.
+
+const localSchema = z.object({
+  title: z.string().trim().min(1, 'title is required').max(300),
+  author: z.string().trim().max(300).default(''),
+  format: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .transform((f) => ((ALL_FORMATS as readonly string[]).includes(f) ? f : 'other')),
+  fileSize: z.number().int().min(0).default(0),
+  fingerprint: z.string().trim().max(128).default(''),
+  language: z.string().default('en'),
+})
+
+export const registerLocalBook = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    errorResponse(res, 'Not authenticated.', 401)
+    return
+  }
+  const parsed = localSchema.safeParse(req.body)
+  if (!parsed.success) {
+    errorResponse(res, parsed.error.issues[0]?.message ?? 'Invalid request.', 400)
+    return
+  }
+  const { userId, plan } = req.user
+  const d = parsed.data
+
+  // Same file imported again (or on a second phone): return the existing record.
+  if (d.fingerprint) {
+    const existing = await Book.findOne({ userId, fingerprint: d.fingerprint, status: 'ready' }).lean()
+    if (existing) {
+      successResponse(res, { book: existing, deduped: true }, 'Book already in your library.', 200)
+      return
+    }
+  }
+
+  if (plan === 'free') {
+    const count = await Book.countDocuments({ userId, status: 'ready' })
+    if (count >= FREE_PLAN_LIBRARY_LIMIT) {
+      errorResponse(
+        res,
+        `Free plan is limited to ${FREE_PLAN_LIBRARY_LIMIT} books. Upgrade to Premium for unlimited access.`,
+        403,
+      )
+      return
+    }
+  }
+
+  const book = await Book.create({
+    userId,
+    title: d.title,
+    author: d.author,
+    originalFormat: d.format as OriginalFormat,
+    fileSize: d.fileSize,
+    fingerprint: d.fingerprint,
+    language: d.language,
+    status: 'ready',
+    source: 'local',
+  })
+
+  successResponse(res, { book: book.toObject() }, 'Book registered.', 201)
+})

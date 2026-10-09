@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{width:100%;height:100%;overflow:hidden;background:#0A0A0A}
+  #viewer{position:absolute;top:0;left:0;right:0;bottom:0}
+</style>
+</head>
+<body>
+<div id="viewer"></div>
+<script src="jszip.min.js"></script>
+<script src="epub.min.js"></script>
+<script>
+(function () {
+  // ── bridge ────────────────────────────────────────────────────────────────
+  var CFG = __READIN_CONFIG__;           // replaced by the Dart server (JSON)
+  var book = null, rendition = null, tocMap = {}, lastLoc = null;
+
+  function post(o) {
+    try { ReadIn.postMessage(JSON.stringify(o)); } catch (e) {}
+  }
+  window.onerror = function (m) { post({ type: 'ERROR', message: String(m) }); };
+
+  var FAMILIES = {
+    'serif': "Georgia, 'Times New Roman', serif",
+    'sans-serif': "-apple-system, Roboto, 'Segoe UI', sans-serif",
+    'literata': "'Literata', Georgia, serif",
+    'merriweather': "'Merriweather', Georgia, serif",
+    'lora': "'Lora', Georgia, serif",
+    'lexend': "'Lexend', Roboto, sans-serif",
+    'atkinson': "'Atkinson Hyperlegible', Roboto, sans-serif",
+    'opendyslexic': "'OpenDyslexic', 'Comic Sans MS', Roboto, sans-serif"
+  };
+  // Web fonts load on demand (first use needs internet; the WebView caches them).
+  var FONT_CSS = {
+    literata: 'https://fonts.googleapis.com/css2?family=Literata:ital,wght@0,400;0,700;1,400&display=swap',
+    merriweather: 'https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,400;0,700;1,400&display=swap',
+    lora: 'https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,700;1,400&display=swap',
+    lexend: 'https://fonts.googleapis.com/css2?family=Lexend:wght@400;700&display=swap',
+    atkinson: 'https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap',
+    opendyslexic: 'https://cdn.jsdelivr.net/npm/@fontsource/opendyslexic@5/400.css'
+  };
+  var currentFontUrl = null;
+  function ensureFont(family) {
+    currentFontUrl = FONT_CSS[family] || null;
+    if (!currentFontUrl || !rendition) return;
+    try { rendition.getContents().forEach(function (c) { c.addStylesheet(currentFontUrl); }); } catch (e) {}
+  }
+  var THEMES = {
+    dark:  { bg: '#0A0A0A', fg: '#E4E4E7' },
+    light: { bg: '#FFFFFF', fg: '#1A1A1A' },
+    sepia: { bg: '#F5E6C8', fg: '#3D2B1F' },
+    night: { bg: '#000000', fg: '#B4B4B4' }
+  };
+  var IS_SCROLL = CFG.flow === 'scroll';
+
+  // p = { fontSize, fontFamily, theme, lineHeight, margin, align }
+  function themeRules(p) {
+    var t = THEMES[p.theme] || THEMES.dark;
+    var fam = FAMILIES[p.fontFamily] || FAMILIES['sans-serif'];
+    return {
+      'html,body,p,span,div,li,td,th,h1,h2,h3,h4,h5,h6': {
+        'color': t.fg + ' !important',
+        'background': 'transparent !important',
+        'font-family': fam + ' !important'
+      },
+      'p,li': { 'text-align': (p.align === 'justify' ? 'justify' : 'left') + ' !important' },
+      'body': {
+        'background': t.bg + ' !important',
+        'font-size': p.fontSize + 'px !important',
+        'line-height': (p.lineHeight || 1.6) + ' !important',
+        'padding': '0 ' + (p.margin == null ? 16 : p.margin) + 'px !important'
+      },
+      'a': { 'color': '#FB923C !important' },
+      'img': { 'max-width': '100% !important' }
+    };
+  }
+
+  // Single registered theme that is re-registered + re-selected on change.
+  // The page / book is NEVER reloaded for a settings change.
+  function applyTheme(p) {
+    if (!rendition) return;
+    ensureFont(p.fontFamily);
+    var name = 'readin-' + [p.theme, p.fontFamily, p.fontSize, p.lineHeight, p.margin, p.align].join('-');
+    rendition.themes.register(name, themeRules(p));
+    rendition.themes.select(name);
+    var t = THEMES[p.theme] || THEMES.dark;
+    document.body.style.background = t.bg;
+    document.getElementById('viewer').style.background = t.bg;
+  }
+
+  function report(loc) {
+    if (!loc || !loc.start) return;
+    lastLoc = loc;
+    var pct = 0;
+    try {
+      pct = book.locations.length()
+        ? Math.round(book.locations.percentageFromCfi(loc.start.cfi) * 100)
+        : Math.round((loc.start.percentage || 0) * 100);
+    } catch (e) {}
+    var base = (loc.start.href || '').split('#')[0];
+    post({
+      type: 'LOCATION',
+      cfi: loc.start.cfi,
+      chapterIndex: loc.start.index || 0,
+      chapterTitle: tocMap[base] || '',
+      href: base,
+      percentage: pct,
+      locationsReady: !!(book.locations && book.locations.length && book.locations.length())
+    });
+  }
+
+  // ── commands from Dart:  readerApi.xxx(...) ───────────────────────────────
+  // ── auto-scroll + read-aloud state ────────────────────────────────────────
+  var autoLevel = 0, autoTimer = null;
+  var ttsContents = null, ttsNodes = [], ttsSent = [], ttsCfi = null;
+
+  function ttsClear() {
+    if (ttsCfi && rendition) {
+      try { rendition.annotations.remove(ttsCfi, 'highlight'); } catch (e) {}
+    }
+    ttsCfi = null;
+  }
+  function ttsPoint(p) {
+    var lo = 0, hi = ttsNodes.length - 1;
+    while (lo < hi) {
+      var mid = (lo + hi + 1) >> 1;
+      if (ttsNodes[mid].start <= p) lo = mid; else hi = mid - 1;
+    }
+    var nd = ttsNodes[lo];
+    return { node: nd.node, offset: Math.max(0, Math.min(p - nd.start, nd.node.nodeValue.length)) };
+  }
+  function ttsRange(sent) {
+    var a = ttsPoint(sent.s), b = ttsPoint(sent.e);
+    var r = ttsContents.document.createRange();
+    r.setStart(a.node, a.offset);
+    r.setEnd(b.node, b.offset);
+    return r;
+  }
+  // Is the range inside the part of the chapter that is on screen right now?
+  function ttsVisible(range) {
+    var rect = range.getBoundingClientRect();
+    var c = rendition.manager && rendition.manager.container;
+    if (!c) return true;
+    if (IS_SCROLL) return rect.top >= c.scrollTop - 2 && rect.top < c.scrollTop + c.clientHeight;
+    return rect.left >= c.scrollLeft - 2 && rect.left < c.scrollLeft + c.clientWidth;
+  }
+
+  window.readerApi = {
+    next: function () { if (rendition) rendition.next(); },
+    prev: function () { if (rendition) rendition.prev(); },
+    display: function (target) {
+      if (!rendition) return;
+      rendition.display(target).catch(function (e) {
+        post({ type: 'ERROR', message: 'Could not navigate: ' + (e && e.message || e) });
+      });
+    },
+    setTheme: function (json) { try { applyTheme(JSON.parse(json)); } catch (e) {} },
+    // ── auto-scroll (scroll flow) / auto page turn (paged flow) ───────────────
+    autoScroll: function (level) {
+      autoLevel = level | 0;
+      if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+      if (!rendition || !autoLevel) return;
+      var stall = 0, lastTop = -1;
+      if (IS_SCROLL) {
+        var px = [0, 0.6, 1.2, 2.4][autoLevel] || 1.2;
+        autoTimer = setInterval(function () {
+          var c = rendition.manager && rendition.manager.container;
+          if (!c) return;
+          c.scrollTop += px;
+          if (c.scrollTop === lastTop) { if (++stall > 40) { stall = 0; rendition.next(); } }
+          else { stall = 0; lastTop = c.scrollTop; }
+        }, 20);
+      } else {
+        var ms = [0, 26000, 15000, 8000][autoLevel] || 15000;
+        autoTimer = setInterval(function () { rendition.next(); }, ms);
+      }
+    },
+
+    // ── read aloud: sentences of the current chapter + highlight ──────────────
+    ttsPrepare: function () {
+      ttsClear();
+      var contents = rendition && rendition.getContents()[0];
+      if (!contents) { post({ type: 'TTS_SENTENCES', items: [], start: 0 }); return; }
+      var doc = contents.document;
+      ttsContents = contents;
+      ttsNodes = []; ttsSent = [];
+      var full = '';
+      var walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, null, false);
+      var n;
+      while ((n = walker.nextNode())) {
+        var v = n.nodeValue || '';
+        var pn = n.parentNode && n.parentNode.nodeName;
+        if (!v.trim() || pn === 'SCRIPT' || pn === 'STYLE') continue;
+        ttsNodes.push({ node: n, start: full.length });
+        full += v + ' ';
+      }
+      var re = /[^.!?]+[.!?]+[\"\u201D\u2019')\]]*|[^.!?]+$/g, m;
+      while ((m = re.exec(full))) {
+        var raw = m[0], lead = raw.length - raw.replace(/^\s+/, '').length;
+        var s = m.index + lead, e = m.index + raw.replace(/\s+$/, '').length;
+        while (e - s > 400) {
+          var cut = full.lastIndexOf(' ', s + 400);
+          if (cut <= s) cut = s + 400;
+          ttsSent.push({ s: s, e: cut }); s = cut + 1;
+        }
+        if (e - s > 2) ttsSent.push({ s: s, e: e });
+      }
+      var items = ttsSent.map(function (x) { return full.slice(x.s, x.e).replace(/\s+/g, ' '); });
+      var start = 0;
+      try {
+        for (var i = 0; i < Math.min(ttsSent.length, 600); i++) {
+          if (ttsVisible(ttsRange(ttsSent[i]))) { start = i; break; }
+        }
+      } catch (err) {}
+      post({ type: 'TTS_SENTENCES', items: items, start: start });
+    },
+    ttsHighlight: function (i) {
+      ttsClear();
+      var sent = ttsSent[i];
+      if (!sent || !rendition) return;
+      try {
+        var r = ttsRange(sent);
+        var cfi = ttsContents.cfiFromRange(r);
+        rendition.annotations.add('highlight', cfi, {}, null, 'tts-hl',
+          { fill: '#FBBF24', 'fill-opacity': '0.45', 'mix-blend-mode': 'normal' });
+        ttsCfi = cfi;
+        if (!ttsVisible(r)) rendition.display(cfi);
+      } catch (e) {}
+    },
+    ttsClear: function () { ttsClear(); },
+
+    setFlow: function (mode) {
+      if (!rendition) return;
+      IS_SCROLL = mode === 'scroll';
+      if (autoLevel) setTimeout(function () { readerApi.autoScroll(autoLevel); }, 600);
+      var cfi = lastLoc && lastLoc.start && lastLoc.start.cfi;
+      try { rendition.flow(IS_SCROLL ? 'scrolled-doc' : 'paginated'); } catch (e) {}
+      if (cfi) rendition.display(cfi);
+    },
+    seekPercent: function (p) {
+      if (!rendition || !book || !book.locations || !book.locations.length()) return;
+      var cfi = book.locations.cfiFromPercentage(Math.max(0, Math.min(1, p)));
+      if (cfi) rendition.display(cfi);
+    },
+    // Full-text search, chapter by chapter (sequential: low memory).
+    search: function (q) {
+      if (!book || !q) { post({ type: 'SEARCH_RESULTS', query: q || '', results: [] }); return; }
+      var results = [];
+      var items = [];
+      book.spine.each(function (it) { items.push(it); });
+      items.reduce(function (chain, item) {
+        return chain.then(function () {
+          if (results.length >= 80) return;
+          return item.load(book.load.bind(book)).then(function () {
+            var found = item.find(q) || [];
+            for (var i = 0; i < found.length && results.length < 80; i++) {
+              results.push({ cfi: found[i].cfi, excerpt: found[i].excerpt });
+            }
+            item.unload();
+          }).catch(function () {});
+        });
+      }, Promise.resolve()).then(function () {
+        post({ type: 'SEARCH_RESULTS', query: q, results: results });
+      });
+    },
+    // epub.js "next section" / "previous section" for the chapter buttons
+    nextSection: function () {
+      if (!rendition || !lastLoc) return;
+      var idx = (lastLoc.start.index || 0) + 1;
+      var s = book.spine.get(idx);
+      if (s) rendition.display(s.href);
+    },
+    prevSection: function () {
+      if (!rendition || !lastLoc) return;
+      var idx = (lastLoc.start.index || 0) - 1;
+      var s = idx >= 0 ? book.spine.get(idx) : null;
+      if (s) rendition.display(s.href);
+    },
+    highlight: function (cfiRange, color, id) {
+      if (!rendition) return;
+      try {
+        rendition.annotations.add('highlight', cfiRange, { id: id },
+          function () { post({ type: 'ANNOTATION_CLICKED', id: id }); },
+          'hl-' + id,
+          { fill: color, 'fill-opacity': '0.35', 'mix-blend-mode': 'multiply' });
+      } catch (e) {}
+    },
+    clearSelection: function () {
+      if (!rendition) return;
+      try {
+        rendition.getContents().forEach(function (c) {
+          var s = c.window.getSelection();
+          if (s) s.removeAllRanges();
+        });
+      } catch (e) {}
+    },
+    removeHighlight: function (cfiRange) {
+      if (!rendition) return;
+      try { rendition.annotations.remove(cfiRange, 'highlight'); } catch (e) {}
+    }
+  };
+
+  // ── keep the screen on while reading (Screen Wake Lock API) ───────────────
+  var wakeLock = null;
+  function lockScreen() {
+    try {
+      if (navigator.wakeLock && !wakeLock) {
+        navigator.wakeLock.request('screen').then(function (s) {
+          wakeLock = s;
+          s.addEventListener('release', function () { wakeLock = null; });
+        }).catch(function () {});
+      }
+    } catch (e) {}
+  }
+  lockScreen();
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') lockScreen();
+  });
+
+  // ── open the book ─────────────────────────────────────────────────────────
+  try {
+    fetch(CFG.bookUrl)
+      .then(function (r) {
+        if (!r.ok) throw new Error('Book file not available (HTTP ' + r.status + ')');
+        return r.arrayBuffer();
+      })
+      .then(function (buf) {
+        book = ePub(buf);
+        rendition = book.renderTo('viewer', {
+          width: '100%', height: '100%', spread: 'none',
+          flow: IS_SCROLL ? 'scrolled-doc' : 'paginated',
+          allowScriptedContent: false
+        });
+        applyTheme(CFG);
+        // Non-blocking: the page renders at once, the font swaps in when loaded.
+        rendition.hooks.content.register(function (contents) {
+          if (currentFontUrl) { try { contents.addStylesheet(currentFontUrl); } catch (e) {} }
+        });
+
+        rendition.display(CFG.initialCfi || undefined)
+          .then(function () { post({ type: 'BOOK_READY' }); })
+          .catch(function (e) {
+            // A stale/invalid CFI must not make the book unopenable.
+            if (CFG.initialCfi) {
+              rendition.display().then(function () { post({ type: 'BOOK_READY' }); })
+                .catch(function (e2) { post({ type: 'ERROR', message: 'Could not render book: ' + (e2 && e2.message || e2) }); });
+            } else {
+              post({ type: 'ERROR', message: 'Could not render book: ' + (e && e.message || e) });
+            }
+          });
+
+        book.loaded.navigation.then(function (nav) {
+          (function walk(items) {
+            items.forEach(function (it) {
+              if (it.href) tocMap[it.href.split('#')[0]] = (it.label || '').trim();
+              if (it.subitems) walk(it.subitems);
+            });
+          })(nav.toc || []);
+          post({ type: 'TOC_READY', toc: nav.toc });
+        }).catch(function () {});
+
+        // Lazy locations (1200 chars): does not block reading.
+        book.ready.then(function () { return book.locations.generate(1200); })
+          .then(function () {
+            post({ type: 'LOCATIONS_READY' });
+            var l = rendition.currentLocation();
+            if (l && l.start) report(l);
+          }).catch(function () {});
+
+        rendition.on('relocated', report);
+
+        rendition.on('selected', function (cfiRange, contents) {
+          try {
+            var s = contents.window.getSelection();
+            var t = s ? s.toString().trim() : '';
+            if (t) post({ type: 'TEXT_SELECTED', selectedText: t, cfiRange: cfiRange });
+          } catch (e) {}
+        });
+
+        // Horizontal swipe = page turn (long text selection keeps working).
+        var tx = 0, ty = 0, tt = 0;
+        rendition.on('touchstart', function (e) {
+          var t = e.changedTouches && e.changedTouches[0];
+          if (t) { tx = t.screenX; ty = t.screenY; tt = Date.now(); }
+        });
+        rendition.on('touchend', function (e) {
+          var t = e.changedTouches && e.changedTouches[0];
+          if (!t) return;
+          var dx = t.screenX - tx, dy = t.screenY - ty;
+          if (IS_SCROLL || Date.now() - tt > 700) return;
+          if (Math.abs(dx) > 50 && Math.abs(dy) < 40 && Math.abs(dx) > Math.abs(dy) * 2) {
+            if (dx < 0) rendition.next(); else rendition.prev();
+          }
+        });
+
+        // Tap zones 25 / 50 / 25 (ignored while text is selected)
+        rendition.on('click', function (e) {
+          var w = window.innerWidth, x = e.clientX || 0;
+          var sel = e.view && e.view.getSelection && e.view.getSelection().toString();
+          if (sel) return;
+          if (IS_SCROLL) { post({ type: 'TAP' }); return; }
+          if (x < w * 0.25) rendition.prev();
+          else if (x > w * 0.75) rendition.next();
+          else post({ type: 'TAP' });
+        });
+      })
+      .catch(function (err) {
+        post({ type: 'ERROR', message: 'Failed to initialise reader: ' + (err && err.message || err) });
+      });
+  } catch (err) {
+    post({ type: 'ERROR', message: 'Failed to initialise reader: ' + (err && err.message || err) });
+  }
+})();
+</script>
+</body>
+</html>
