@@ -38,7 +38,7 @@ const makeRedisStore = (prefix: string): RedisStore =>
 
 export const generalLimiter = rateLimit({
   windowMs: Number(process.env['RATE_LIMIT_WINDOW_MS'] ?? '900000'),
-  max: Number(process.env['RATE_LIMIT_MAX_GENERAL'] ?? '200'),
+  max: Number(process.env['RATE_LIMIT_MAX_GENERAL'] ?? '600'),
   standardHeaders: true,
   legacyHeaders: false,
   store: makeRedisStore('rl:general:'),
@@ -63,5 +63,25 @@ export const uploadLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   store: makeRedisStore('rl:upload:'),
+  handler: rateLimitHandler,
+})
+
+/** Admin API: generous for a human, stingy for a bot. */
+export const adminLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: Number(process.env['RATE_LIMIT_MAX_ADMIN'] ?? '300'),
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: makeRedisStore('rl:admin:'),
+  handler: rateLimitHandler,
+})
+
+/** Feature / sync endpoints used by the mobile app. */
+export const syncLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: Number(process.env['RATE_LIMIT_MAX_SYNC'] ?? '600'),
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: makeRedisStore('rl:sync:'),
   handler: rateLimitHandler,
 })

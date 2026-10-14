@@ -8,6 +8,15 @@ export interface IUser extends Document {
   displayName: string
   avatar: string
   plan: 'free' | 'premium'
+  /** 'admin' is set ONLY by the create-admin script, never through the API. */
+  role: 'user' | 'admin'
+  /** An administrator can switch an account off (cannot log in or refresh). */
+  disabled: boolean
+  lastLoginAt: Date | null
+  /** When the paid period ends (from RevenueCat); informational for the admin panel. */
+  premiumUntil: Date | null
+  /** Timestamp of the last RevenueCat event applied (ignores late, out-of-order events). */
+  premiumEventAt: Date | null
   isEmailVerified: boolean
   emailVerificationToken: string | null
   emailVerificationExpires: Date | null
@@ -50,6 +59,27 @@ const userSchema = new Schema<IUser>(
       type: String,
       enum: ['free', 'premium'],
       default: 'free',
+    },
+    role: {
+      type: String,
+      enum: ['user', 'admin'],
+      default: 'user',
+    },
+    disabled: {
+      type: Boolean,
+      default: false,
+    },
+    lastLoginAt: {
+      type: Date,
+      default: null,
+    },
+    premiumUntil: {
+      type: Date,
+      default: null,
+    },
+    premiumEventAt: {
+      type: Date,
+      default: null,
     },
     isEmailVerified: {
       type: Boolean,

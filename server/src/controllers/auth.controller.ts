@@ -1,3 +1,4 @@
+import { verifyGoogleIdToken } from '../utils/google.utils.js'
 import type { Request, Response } from 'express'
 import asyncHandler from 'express-async-handler'
 import { z } from 'zod'
@@ -58,6 +59,7 @@ const formatUser = (user: {
   displayName: string
   avatar: string
   plan: string
+  role: string
   isEmailVerified: boolean
 }) => ({
   id: user._id.toString(),
@@ -65,6 +67,7 @@ const formatUser = (user: {
   displayName: user.displayName,
   avatar: user.avatar,
   plan: user.plan,
+  role: user.role,
   isEmailVerified: user.isEmailVerified,
 })
 
@@ -171,6 +174,12 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     return
   }
 
+  if (user.disabled) {
+    errorResponse(res, 'This account has been disabled. Please contact support.', 403)
+    return
+  }
+  user.lastLoginAt = new Date()
+
   const accessToken = generateAccessToken(user._id.toString(), user.plan)
   const refreshToken = generateRefreshToken(user._id.toString())
 
@@ -205,8 +214,22 @@ export const googleOAuth = asyncHandler(async (req: Request, res: Response) => {
     return
   }
 
-  const { googleId, email, displayName, avatar } = parsed.data
-  const normalizedEmail = email.toLowerCase()
+  // SECURITY: the identity comes from a Google ID token verified with Google,
+  // never from fields the client sends (otherwise anyone could sign in as any
+  // e-mail address, including an administrator).
+  const rawIdToken: unknown = (req.body as Record<string, unknown> | undefined)?.['idToken']
+  const identity =
+    typeof rawIdToken === 'string' && rawIdToken.length > 20
+      ? await verifyGoogleIdToken(rawIdToken)
+      : null
+  if (!identity) {
+    errorResponse(res, 'Google sign-in could not be verified.', 401)
+    return
+  }
+  const googleId = identity.sub
+  const normalizedEmail = identity.email.toLowerCase()
+  const displayName = identity.name || parsed.data.displayName
+  const avatar = identity.picture || parsed.data.avatar
 
   // ── Resolve the user (find / link / create) ────────────────────────────────
   const resolvedUser = await (async () => {
@@ -216,6 +239,7 @@ export const googleOAuth = asyncHandler(async (req: Request, res: Response) => {
 
     // 2. Has an email account — link Google to it
     const byEmail = await User.findOne({ email: normalizedEmail })
+    if (byEmail && byEmail.role === 'admin') return byEmail // rejected below, never linked
     if (byEmail) {
       byEmail.googleId = googleId
       byEmail.isEmailVerified = true
@@ -235,6 +259,17 @@ export const googleOAuth = asyncHandler(async (req: Request, res: Response) => {
     })
   })()
   // TypeScript now knows resolvedUser is IUser (never null) ✓
+
+  // Administrators sign in with e-mail + password only.
+  if (resolvedUser.role === 'admin') {
+    errorResponse(res, 'Administrator accounts must sign in with e-mail and password.', 403)
+    return
+  }
+  if (resolvedUser.disabled) {
+    errorResponse(res, 'This account has been disabled. Please contact support.', 403)
+    return
+  }
+  resolvedUser.lastLoginAt = new Date()
 
   const accessToken = generateAccessToken(
     resolvedUser._id.toString(),
@@ -289,6 +324,11 @@ export const refreshToken = asyncHandler(
         'Refresh token not recognised. Please log in again.',
         401,
       )
+      return
+    }
+
+    if (user.disabled) {
+      errorResponse(res, 'This account has been disabled.', 401)
       return
     }
 
