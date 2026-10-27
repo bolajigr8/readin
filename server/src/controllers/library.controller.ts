@@ -1,3 +1,5 @@
+import { getBillingConfig } from '../services/billing.service.js'
+import { limitMessage } from '../services/billing.logic.js'
 import type { Request, Response } from 'express'
 import asyncHandler from 'express-async-handler'
 import { z } from 'zod'
@@ -10,7 +12,6 @@ import { Progress } from '../models/progress.model.js'
 import { cloudinaryService } from '../services/cloudinary.service.js'
 import { successResponse, errorResponse } from '../utils/response.utils.js'
 
-const FREE_PLAN_LIBRARY_LIMIT = 10
 
 const discoverSchema = z.object({
   gutenbergId: z.string().min(1, 'gutenbergId is required'),
@@ -76,7 +77,8 @@ export const getLibrary = asyncHandler(async (req: Request, res: Response) => {
     }
   })
 
-  const limitReached = plan === 'free' && total >= FREE_PLAN_LIBRARY_LIMIT
+  const billing = await getBillingConfig()
+  const limitReached = plan === 'free' && total >= billing.freeLibraryLimit
 
   successResponse(res, {
     books: enrichedBooks,
@@ -209,11 +211,12 @@ export const saveDiscoveredBook = asyncHandler(
 
     // Freemium gate
     if (plan === 'free') {
+      const billing = await getBillingConfig()
       const count = await Book.countDocuments({ userId, status: 'ready' })
-      if (count >= FREE_PLAN_LIBRARY_LIMIT) {
+      if (count >= billing.freeLibraryLimit) {
         errorResponse(
           res,
-          `Free plan is limited to ${FREE_PLAN_LIBRARY_LIMIT} books. Upgrade to Premium for unlimited access.`,
+          limitMessage(billing),
           403,
         )
         return
@@ -280,11 +283,12 @@ export const registerLocalBook = asyncHandler(async (req: Request, res: Response
   }
 
   if (plan === 'free') {
+    const billing = await getBillingConfig()
     const count = await Book.countDocuments({ userId, status: 'ready' })
-    if (count >= FREE_PLAN_LIBRARY_LIMIT) {
+    if (count >= billing.freeLibraryLimit) {
       errorResponse(
         res,
-        `Free plan is limited to ${FREE_PLAN_LIBRARY_LIMIT} books. Upgrade to Premium for unlimited access.`,
+        limitMessage(billing),
         403,
       )
       return

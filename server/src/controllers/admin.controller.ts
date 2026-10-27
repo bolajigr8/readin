@@ -7,6 +7,16 @@ import { AppConfig } from '../models/appConfig.model.js'
 import { Book } from '../models/book.model.js'
 import { User } from '../models/user.model.js'
 import { UserFeature } from '../models/userFeature.model.js'
+import { Payment } from '../models/payment.model.js'
+import { getBillingConfig, invalidateBillingConfig } from '../services/billing.service.js'
+import {
+  MAX_PLANS,
+  MAX_PRICE_KOBO,
+  MIN_PRICE_KOBO,
+  formatNaira,
+  normalizePlansInput,
+} from '../services/billing.logic.js'
+import { paystackConfigured, paystackMode, publicBaseUrl } from '../services/paystack.service.js'
 import { errorResponse, successResponse } from '../utils/response.utils.js'
 import {
   FEATURE_KEYS,
@@ -72,6 +82,7 @@ const featureConfigSchema = z
     enabled: z.boolean().optional(),
     trialDays: z.number().int().min(0).max(365).optional(),
     includedInPremium: z.boolean().optional(),
+    freeForAll: z.boolean().optional(),
   })
   .strict()
 
@@ -305,15 +316,41 @@ export const resetTrial = asyncHandler(async (req: Request, res: Response) => {
 /** GET /admin/stats */
 export const getStats = asyncHandler(async (_req: Request, res: Response) => {
   const since7 = new Date(Date.now() - 7 * 24 * 3600 * 1000)
-  const [users, premium, disabled, newThisWeek, books, trials] = await Promise.all([
-    User.countDocuments({}),
-    User.countDocuments({ plan: 'premium' }),
-    User.countDocuments({ disabled: true }),
-    User.countDocuments({ createdAt: { $gte: since7 } }),
-    Book.countDocuments({}),
-    UserFeature.countDocuments({ key: 'habits', trialStartedAt: { $ne: null } }),
-  ])
-  successResponse(res, { users, premium, disabled, newThisWeek, books, habitsTrialsStarted: trials }, 'OK')
+  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+  const sum = async (match: Record<string, unknown>): Promise<number> => {
+    const r = await Payment.aggregate<{ total: number }>([
+      { $match: { status: 'success', ...match } },
+      { $group: { _id: null, total: { $sum: '$amountKobo' } } },
+    ])
+    return r[0]?.total ?? 0
+  }
+  const [users, premium, disabled, newThisWeek, books, trials, paymentsCount, revenueKobo, revenueMonthKobo] =
+    await Promise.all([
+      User.countDocuments({}),
+      User.countDocuments({ plan: 'premium' }),
+      User.countDocuments({ disabled: true }),
+      User.countDocuments({ createdAt: { $gte: since7 } }),
+      Book.countDocuments({}),
+      UserFeature.countDocuments({ key: 'habits', trialStartedAt: { $ne: null } }),
+      Payment.countDocuments({ status: 'success' }),
+      sum({}),
+      sum({ paidAt: { $gte: monthStart } }),
+    ])
+  successResponse(
+    res,
+    {
+      users,
+      premium,
+      disabled,
+      newThisWeek,
+      books,
+      habitsTrialsStarted: trials,
+      paymentsCount,
+      revenueKobo,
+      revenueMonthKobo,
+    },
+    'OK',
+  )
 })
 
 /** GET /admin/audit?limit= — latest admin actions */
@@ -332,6 +369,149 @@ export const getAudit = asyncHandler(async (req: Request, res: Response) => {
         ip: r.ip,
         createdAt: r.createdAt,
       })),
+    },
+    'OK',
+  )
+})
+
+// ── e-mail verification by hand ───────────────────────────────────────────────
+
+/** POST /admin/users/:id/verify — mark the e-mail as confirmed (no link needed). */
+export const verifyUserEmail = asyncHandler(async (req: Request, res: Response) => {
+  const id = userIdParam(req, res)
+  if (!id) return
+  const r = await User.updateOne(
+    { _id: id },
+    { $set: { isEmailVerified: true, emailVerificationToken: null, emailVerificationExpires: null } },
+  )
+  if (r.matchedCount === 0) {
+    errorResponse(res, 'User not found.', 404)
+    return
+  }
+  await audit(req, 'user.verify-email', id, null)
+  successResponse(res, { isEmailVerified: true }, 'E-mail marked as verified.')
+})
+
+// ── billing (Paystack) ────────────────────────────────────────────────────────
+
+const planSchema = z
+  .object({
+    id: z.string().max(60).optional(),
+    name: z.string().trim().min(1).max(40),
+    description: z.string().trim().max(120).optional(),
+    priceKobo: z.number().int().min(MIN_PRICE_KOBO).max(MAX_PRICE_KOBO),
+    durationDays: z.number().int().min(1).max(3650),
+    active: z.boolean(),
+    badge: z.string().trim().max(20).optional(),
+  })
+  .strict()
+
+const billingSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    freeLibraryLimit: z.number().int().min(1).max(1000).optional(),
+    plans: z.array(planSchema).max(MAX_PLANS).optional(),
+  })
+  .strict()
+
+const billingView = async () => ({
+  billing: await getBillingConfig(),
+  paystack: {
+    configured: paystackConfigured(),
+    mode: paystackMode(),
+    callbackUrl: `${publicBaseUrl()}/payment/callback`,
+    webhookUrl: `${publicBaseUrl()}/api/v1/webhooks/paystack`,
+  },
+})
+
+/** GET /admin/billing */
+export const getBilling = asyncHandler(async (_req: Request, res: Response) => {
+  invalidateBillingConfig()
+  successResponse(res, await billingView(), 'OK')
+})
+
+/**
+ * PUT /admin/billing { enabled?, freeLibraryLimit?, plans? }
+ * Prices are in KOBO (₦1 = 100 kobo). Turning payments ON needs Paystack keys on
+ * the server and at least one active plan.
+ */
+export const setBilling = asyncHandler(async (req: Request, res: Response) => {
+  const parsed = billingSchema.safeParse(req.body)
+  if (!parsed.success) {
+    errorResponse(res, 'Invalid billing settings (check names and prices).', 400)
+    return
+  }
+  const current = await getBillingConfig()
+  const next = {
+    ...current,
+    ...(parsed.data.enabled === undefined ? {} : { enabled: parsed.data.enabled }),
+    ...(parsed.data.freeLibraryLimit === undefined ? {} : { freeLibraryLimit: parsed.data.freeLibraryLimit }),
+    ...(parsed.data.plans === undefined ? {} : { plans: normalizePlansInput(parsed.data.plans) }),
+  }
+
+  if (next.enabled && !paystackConfigured()) {
+    errorResponse(
+      res,
+      'Paystack is not connected. Add PAYSTACK_SECRET_KEY to the server settings first, then turn payments on.',
+      400,
+    )
+    return
+  }
+  if (next.enabled && !next.plans.some((p) => p.active)) {
+    errorResponse(res, 'Add at least one ACTIVE plan before turning payments on.', 400)
+    return
+  }
+
+  await AppConfig.updateOne(
+    { key: 'features' },
+    { $set: { billing: next, updatedBy: req.user?.userId ?? null } },
+    { upsert: true },
+  )
+  invalidateBillingConfig()
+  await audit(req, 'billing.update', null, {
+    enabled: next.enabled,
+    freeLibraryLimit: next.freeLibraryLimit,
+    plans: next.plans.map((p) => `${p.name}: ${formatNaira(p.priceKobo)} / ${p.durationDays}d${p.active ? '' : ' (off)'}`),
+  })
+  successResponse(res, await billingView(), 'Saved.')
+})
+
+/** GET /admin/payments?status=&page=&limit= */
+export const listPayments = asyncHandler(async (req: Request, res: Response) => {
+  const page = Math.max(1, Number(req.query['page'] ?? 1) || 1)
+  const limit = Math.min(100, Math.max(1, Number(req.query['limit'] ?? 25) || 25))
+  const wanted = (['pending', 'success', 'failed', 'abandoned'] as const).find(
+    (st) => st === String(req.query['status'] ?? ''),
+  )
+  const filter: { status?: 'pending' | 'success' | 'failed' | 'abandoned' } = wanted ? { status: wanted } : {}
+  const [rows, total] = await Promise.all([
+    Payment.find(filter)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean(),
+    Payment.countDocuments(filter),
+  ])
+  successResponse(
+    res,
+    {
+      items: rows.map((p) => ({
+        id: String(p._id),
+        userId: String(p.userId),
+        email: p.email,
+        planName: p.planName,
+        amountKobo: p.amountKobo,
+        amountText: formatNaira(p.amountKobo),
+        status: p.status,
+        channel: p.channel,
+        reference: p.reference,
+        paidAt: p.paidAt,
+        premiumUntil: p.premiumUntil,
+        createdAt: p.createdAt,
+      })),
+      total,
+      page,
+      limit,
     },
     'OK',
   )

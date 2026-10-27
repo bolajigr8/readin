@@ -10,4 +10,14 @@ export interface IEmailProvider {
   sendVerificationEmail(to: string, name: string, token: string): Promise<void>
   sendPasswordResetEmail(to: string, name: string, token: string): Promise<void>
   sendWelcomeEmail(to: string, name: string): Promise<void>
+  sendPasswordChangedEmail(to: string, name: string): Promise<void>
+  sendPaymentReceiptEmail(input: {
+    to: string
+    name: string
+    planName: string
+    amountKobo: number
+    reference: string
+    paidAt: Date
+    premiumUntil: Date
+  }): Promise<void>
 }

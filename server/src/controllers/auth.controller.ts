@@ -13,6 +13,8 @@ import {
 } from '../utils/jwt.utils.js'
 import { successResponse, errorResponse } from '../utils/response.utils.js'
 import { emailService } from '../services/email/email.service.js'
+import { effectivePlan } from '../services/billing.logic.js'
+import { verifyEmailPage } from '../services/pages/pages.js'
 
 // ── Zod Schemas ───────────────────────────────────────────────────────────────
 
@@ -60,16 +62,27 @@ const formatUser = (user: {
   avatar: string
   plan: string
   role: string
+  premiumUntil?: Date | null
   isEmailVerified: boolean
 }) => ({
   id: user._id.toString(),
   email: user.email,
   displayName: user.displayName,
   avatar: user.avatar,
-  plan: user.plan,
+  plan: effectivePlan(user.plan === 'premium' ? 'premium' : 'free', user.premiumUntil ?? null, new Date()),
   role: user.role,
+  premiumUntil: user.premiumUntil ?? null,
   isEmailVerified: user.isEmailVerified,
 })
+
+/** Paid time over → Free (so the token we hand out says so). Returns true when changed. */
+const expirePlanIfNeeded = (user: { plan: 'free' | 'premium'; premiumUntil: Date | null }): boolean => {
+  if (user.plan === 'premium' && effectivePlan('premium', user.premiumUntil, new Date()) === 'free') {
+    user.plan = 'free'
+    return true
+  }
+  return false
+}
 
 // ── Controllers ───────────────────────────────────────────────────────────────
 
@@ -179,6 +192,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     return
   }
   user.lastLoginAt = new Date()
+  expirePlanIfNeeded(user)
 
   const accessToken = generateAccessToken(user._id.toString(), user.plan)
   const refreshToken = generateRefreshToken(user._id.toString())
@@ -332,6 +346,7 @@ export const refreshToken = asyncHandler(
       return
     }
 
+    if (expirePlanIfNeeded(user)) await user.save()
     const accessToken = generateAccessToken(user._id.toString(), user.plan)
 
     successResponse(res, { accessToken }, 'Access token refreshed.')
@@ -359,44 +374,91 @@ export const logout = asyncHandler(async (req: Request, res: Response) => {
   successResponse(res, null, 'Logged out successfully.')
 })
 
+export type VerifyOutcome = 'ok' | 'already' | 'expired' | 'invalid'
+
 /**
- * GET /api/v1/auth/verify-email/:token
+ * Confirms an e-mail address from the token in the e-mail. The token is kept
+ * after use (until it expires) so that a second click — or a mail scanner that
+ * opened the link first — still shows "confirmed" instead of an error.
  */
-export const verifyEmail = asyncHandler(async (req: Request, res: Response) => {
-  const token = req.params['token']
-
-  if (!token) {
-    errorResponse(res, 'Verification token is missing.', 400)
-    return
-  }
-
-  const user = await User.findOne({
-    emailVerificationToken: token,
-    emailVerificationExpires: { $gt: new Date() },
-  })
-
-  if (!user) {
-    errorResponse(
-      res,
-      'Verification link is invalid or has expired. Please request a new one.',
-      400,
-    )
-    return
+export const verifyEmailByToken = async (token: string): Promise<VerifyOutcome> => {
+  if (!token || token.length > 100) return 'invalid'
+  const user = await User.findOne({ emailVerificationToken: token })
+  if (!user) return 'invalid'
+  if (user.isEmailVerified) return 'already'
+  if (!user.emailVerificationExpires || user.emailVerificationExpires.getTime() < Date.now()) {
+    return 'expired'
   }
 
   user.isEmailVerified = true
-  user.emailVerificationToken = null
-  user.emailVerificationExpires = null
   await user.save()
 
   // Fire-and-forget welcome email
   emailService
     .sendWelcomeEmail(user.email, user.displayName)
-    .catch((err: unknown) =>
-      console.error('[email] Failed to send welcome email:', err),
-    )
+    .catch((err: unknown) => console.error('[email] Failed to send welcome email:', err))
+  return 'ok'
+}
 
-  successResponse(res, null, 'Email verified successfully. You can now log in.')
+/** Is this password-reset token real and not expired? (used by the reset page) */
+export const isResetTokenValid = async (token: string): Promise<boolean> => {
+  if (!token || token.length > 100) return false
+  const user = await User.findOne({
+    passwordResetToken: token,
+    passwordResetExpires: { $gt: new Date() },
+  }).select('_id')
+  return !!user
+}
+
+/**
+ * GET /api/v1/auth/verify-email/:token
+ * (Old e-mails still point here.) Browsers get the pretty page, apps get JSON.
+ */
+export const verifyEmail = asyncHandler(async (req: Request, res: Response) => {
+  const token = String(req.params['token'] ?? '')
+  const outcome = await verifyEmailByToken(token)
+
+  if (req.accepts(['json', 'html']) === 'html') {
+    res.status(outcome === 'ok' || outcome === 'already' ? 200 : 400).type('html').send(verifyEmailPage(outcome))
+    return
+  }
+  if (outcome === 'ok' || outcome === 'already') {
+    successResponse(res, null, 'Email verified successfully. You can now log in.')
+    return
+  }
+  errorResponse(res, 'Verification link is invalid or has expired. Please request a new one.', 400)
+})
+
+/**
+ * POST /api/v1/auth/resend-verification  { email }
+ * Always answers the same (never reveals whether an account exists).
+ */
+export const resendVerification = asyncHandler(async (req: Request, res: Response) => {
+  const parsed = forgotPasswordSchema.safeParse(req.body)
+  if (!parsed.success) {
+    errorResponse(res, 'A valid email address is required.', 400)
+    return
+  }
+  const safe = 'If that account still needs confirming, a new link is on its way.'
+  const user = await User.findOne({ email: parsed.data.email.toLowerCase() })
+  if (!user || user.isEmailVerified) {
+    successResponse(res, null, safe)
+    return
+  }
+  // At most one new e-mail per minute per account.
+  const issuedAt = user.emailVerificationExpires ? user.emailVerificationExpires.getTime() - 24 * 3600_000 : 0
+  if (Date.now() - issuedAt < 60_000) {
+    successResponse(res, null, safe)
+    return
+  }
+  const token = uuidv4()
+  user.emailVerificationToken = token
+  user.emailVerificationExpires = new Date(Date.now() + 24 * 3600_000)
+  await user.save()
+  emailService
+    .sendVerificationEmail(user.email, user.displayName, token)
+    .catch((err: unknown) => console.error('[email] Failed to resend verification:', err))
+  successResponse(res, null, safe)
 })
 
 /**
@@ -471,6 +533,10 @@ export const resetPassword = asyncHandler(
     user.passwordResetExpires = null
     user.refreshTokens = [] // Revoke all sessions — force re-login everywhere
     await user.save()
+
+    emailService
+      .sendPasswordChangedEmail(user.email, user.displayName)
+      .catch((err: unknown) => console.error('[email] Failed to send password-changed notice:', err))
 
     successResponse(
       res,

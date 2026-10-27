@@ -1,3 +1,5 @@
+import { getBillingConfig } from '../services/billing.service.js';
+import { limitMessage } from '../services/billing.logic.js';
 import type { Request, Response } from 'express';
 import asyncHandler from 'express-async-handler';
 import { v4 as uuidv4 } from 'uuid';
@@ -16,7 +18,6 @@ import type { OriginalFormat } from '../models/book.model.js';
 // Flip the env var to 'true' later to bring the queue back.
 export const CONVERSION_ENABLED = process.env['CONVERSION_ENABLED'] === 'true';
 
-const FREE_PLAN_LIBRARY_LIMIT = 10;
 
 // ── Format detection ──────────────────────────────────────────────────────────
 // Phones very often send "application/octet-stream" (or nothing) for .epub
@@ -113,11 +114,12 @@ export const uploadFile = asyncHandler(async (req: Request, res: Response) => {
 
   // ── Free-plan library limit (same rule the Discover flow already enforces) ─
   if (plan === 'free') {
+    const billing = await getBillingConfig();
     const count = await Book.countDocuments({ userId, status: 'ready' });
-    if (count >= FREE_PLAN_LIBRARY_LIMIT) {
+    if (count >= billing.freeLibraryLimit) {
       errorResponse(
         res,
-        `Free plan is limited to ${FREE_PLAN_LIBRARY_LIMIT} books. Upgrade to Premium for unlimited access.`,
+        limitMessage(billing),
         403,
       );
       return;

@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import express from 'express'
-import { revenueCatWebhook } from '../controllers/webhooks.controller.js'
+import { paystackWebhook, revenueCatWebhook } from '../controllers/webhooks.controller.js'
 
 const router = Router()
 
@@ -12,5 +12,8 @@ router.post(
   express.raw({ type: 'application/json' }),
   revenueCatWebhook,
 )
+
+// Paystack: the signature is checked against `req.rawBody` (captured by the global json parser).
+router.post('/paystack', paystackWebhook)
 
 export default router

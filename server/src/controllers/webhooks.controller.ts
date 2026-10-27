@@ -4,6 +4,8 @@ import asyncHandler from 'express-async-handler'
 import { Types } from 'mongoose'
 import { User } from '../models/user.model.js'
 import { decide, pickUserId, type RcEvent } from '../services/revenuecat.logic.js'
+import { verifyWebhookSignature } from '../services/paystack.service.js'
+import { settlePayment } from '../services/payments.service.js'
 
 /** Constant-time comparison (no timing leak of the secret). */
 const safeEqual = (a: string, b: string): boolean => {
@@ -68,5 +70,32 @@ export const revenueCatWebhook = asyncHandler(async (req: Request, res: Response
   }
 
   // A database error above throws (500) so RevenueCat retries; everything else is acknowledged.
+  res.status(200).json({ received: true })
+})
+
+/**
+ * POST /api/v1/webhooks/paystack
+ * Paystack signs the raw body (x-paystack-signature, HMAC-SHA512). Only a valid
+ * signature is accepted; the payment is then re-checked with Paystack itself, so a
+ * forged request can never give anyone Premium.
+ */
+export const paystackWebhook = asyncHandler(async (req: Request, res: Response) => {
+  const raw = (req as Request & { rawBody?: Buffer }).rawBody
+  const signature = req.headers['x-paystack-signature']
+  if (!verifyWebhookSignature(raw, typeof signature === 'string' ? signature : undefined)) {
+    res.status(401).json({ success: false, message: 'Invalid signature.' })
+    return
+  }
+
+  const body = req.body as { event?: string; data?: { reference?: string } } | undefined
+  if (body?.event === 'charge.success' && typeof body.data?.reference === 'string') {
+    const outcome = await settlePayment(body.data.reference)
+    console.log(`[paystack] charge.success ${body.data.reference} → ${outcome.status}`)
+    if (outcome.status === 'error') {
+      // Paystack unreachable right now: answer 500 so Paystack retries the webhook later.
+      res.status(500).json({ received: false })
+      return
+    }
+  }
   res.status(200).json({ received: true })
 })

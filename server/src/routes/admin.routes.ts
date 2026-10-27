@@ -3,6 +3,10 @@ import { protect } from '../middleware/auth.middleware.js'
 import { requireAdmin } from '../middleware/admin.middleware.js'
 import {
   getAudit,
+  getBilling,
+  listPayments,
+  setBilling,
+  verifyUserEmail,
   getConfig,
   getStats,
   getUser,
@@ -25,9 +29,14 @@ router.get('/audit', getAudit)
 router.get('/config', getConfig)
 router.put('/config/features/:key', setFeatureConfig)
 
+router.get('/billing', getBilling)
+router.put('/billing', setBilling)
+router.get('/payments', listPayments)
+
 router.get('/users', listUsers)
 router.get('/users/:id', getUser)
 router.patch('/users/:id', patchUser)
+router.post('/users/:id/verify', verifyUserEmail)
 router.post('/users/:id/features/:key/grant', grantFeature)
 router.post('/users/:id/features/:key/revoke', revokeFeature)
 router.post('/users/:id/features/:key/restore', restoreFeature)

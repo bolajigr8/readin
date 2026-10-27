@@ -16,10 +16,12 @@ export interface FeatureConfig {
   trialDays: number
   /** Premium subscribers get the feature without a trial. */
   includedInPremium: boolean
+  /** Everybody (signed-in) can use it for free, no trial and no Premium needed. */
+  freeForAll: boolean
 }
 
 export const DEFAULT_FEATURES: Record<FeatureKey, FeatureConfig> = {
-  habits: { enabled: true, trialDays: 14, includedInPremium: true },
+  habits: { enabled: true, trialDays: 14, includedInPremium: true, freeForAll: false },
 }
 
 /** What the admin changed for ONE user and ONE feature. */
@@ -82,6 +84,9 @@ export const evaluateAccess = (input: {
   if (uf?.revoked) {
     return { ...base, state: 'locked', reason: 'Access was removed by an administrator.' }
   }
+  if (config.freeForAll) {
+    return { ...base, state: 'full', allowed: true, reason: 'free for everyone' }
+  }
   if (uf?.grantedUntil && uf.grantedUntil.getTime() > now.getTime()) {
     return { ...base, state: 'full', allowed: true, reason: 'granted' }
   }
@@ -133,6 +138,7 @@ export const mergeFeatureConfig = (
       trialDays: Math.min(365, Math.max(0, Math.round(days))),
       includedInPremium:
         typeof s.includedInPremium === 'boolean' ? s.includedInPremium : d.includedInPremium,
+      freeForAll: typeof s.freeForAll === 'boolean' ? s.freeForAll : d.freeForAll,
     }
   }
   return out

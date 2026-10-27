@@ -31,6 +31,14 @@ export class EmailService {
   sendWelcomeEmail(to: string, name: string): Promise<void> {
     return this.provider.sendWelcomeEmail(to, name)
   }
+
+  sendPasswordChangedEmail(to: string, name: string): Promise<void> {
+    return this.provider.sendPasswordChangedEmail(to, name)
+  }
+
+  sendPaymentReceiptEmail(input: Parameters<IEmailProvider['sendPaymentReceiptEmail']>[0]): Promise<void> {
+    return this.provider.sendPaymentReceiptEmail(input)
+  }
 }
 
 // ── Singleton — swap `new ResendProvider()` here to change the active provider

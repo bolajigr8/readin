@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { evaluateAccess, mergeFeatureConfig, DEFAULT_FEATURES } from '../src/services/entitlements.logic.ts'
 
-const cfg = { enabled: true, trialDays: 14, includedInPremium: true }
+const cfg = { enabled: true, trialDays: 14, includedInPremium: true, freeForAll: false }
 const day = 24 * 3600 * 1000
 const now = new Date('2026-10-20T12:00:00Z')
 let n = 0
@@ -67,5 +67,19 @@ t('mergeFeatureConfig: defaults, sanitising and unknown keys', () => {
   assert.equal(mergeFeatureConfig({ habits: { trialDays: -4 } }).habits.trialDays, 0)
   assert.equal(mergeFeatureConfig({ habits: { trialDays: 'x' } }).habits.trialDays, 14)
   assert.equal('bogus' in m, false)
+})
+t('free for everyone: no trial / Premium needed — but a block and "off" still win', () => {
+  const free = { ...cfg, freeForAll: true }
+  const a = acc({ config: free })
+  assert.equal(a.state, 'full'); assert.equal(a.allowed, true); assert.equal(a.reason, 'free for everyone')
+  assert.equal(acc({ config: { ...free, enabled: false } }).state, 'disabled')
+  assert.equal(acc({ config: free, uf: { trialStartedAt: null, grantedUntil: null, revoked: true } }).state, 'locked')
+  // even a user whose trial already ended gets it back
+  assert.equal(acc({ config: free, uf: { trialStartedAt: new Date(now.getTime() - 40 * day), grantedUntil: null, revoked: false } }).state, 'full')
+})
+t('mergeFeatureConfig knows freeForAll (default off)', () => {
+  assert.equal(mergeFeatureConfig(null).habits.freeForAll, false)
+  assert.equal(mergeFeatureConfig({ habits: { freeForAll: true } }).habits.freeForAll, true)
+  assert.equal(mergeFeatureConfig({ habits: { freeForAll: 'yes' } }).habits.freeForAll, false)
 })
 console.log(`\n${n} tests passed`)

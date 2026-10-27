@@ -101,7 +101,7 @@ export const putSync = asyncHandler(async (req: Request, res: Response) => {
   const updated = await UserData.findOneAndUpdate(
     { userId: ctx.actorId, key: ctx.key, version: baseVersion },
     { $set: { data }, $inc: { version: 1 } },
-    { new: true },
+    { returnDocument: 'after' },
   )
   if (!updated) {
     await conflict()

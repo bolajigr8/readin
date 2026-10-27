@@ -1,7 +1,16 @@
 // To swap email provider: implement IEmailProvider and update email.service.ts
 
 import { Resend } from 'resend'
-import { IEmailProvider } from '../email/email.interface'
+import type { IEmailProvider } from '../email/email.interface.js'
+import {
+  passwordChangedEmail,
+  passwordResetEmail,
+  receiptEmail,
+  verificationEmail,
+  welcomeEmail,
+  type Rendered,
+} from '../email/templates.js'
+import { formatNaira } from '../billing.logic.js'
 
 export class ResendProvider implements IEmailProvider {
   private readonly client: Resend
@@ -17,89 +26,49 @@ export class ResendProvider implements IEmailProvider {
 
     this.client = new Resend(apiKey)
     this.from = from
-    this.appUrl = process.env['APP_URL'] ?? 'http://localhost:5000'
+    this.appUrl = (process.env['APP_URL'] ?? 'http://localhost:5000').trim().replace(/\/+$/, '')
   }
 
-  async sendVerificationEmail(
-    to: string,
-    name: string,
-    token: string,
-  ): Promise<void> {
-    const verifyUrl = `${this.appUrl}/api/v1/auth/verify-email/${token}`
-
-    await this.client.emails.send({
+  private async send(to: string, mail: Rendered): Promise<void> {
+    const { error } = await this.client.emails.send({
       from: this.from,
       to,
-      subject: 'Verify your ReadIn email address',
-      html: `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; color: #1a1a2e;">
-          <h1 style="font-size: 24px; margin-bottom: 8px;">Welcome to ReadIn, ${name}! 👋</h1>
-          <p style="color: #555; line-height: 1.6;">Thanks for signing up. Please verify your email address to activate your account.</p>
-          
-            href="${verifyUrl}"
-            style="display: inline-block; margin: 24px 0; padding: 14px 28px; background: #6c63ff; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;"
-          >
-            Verify Email Address
-          </a>
-          <p style="color: #888; font-size: 13px;">This link expires in <strong>24 hours</strong>. If you didn't create a ReadIn account, you can safely ignore this email.</p>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 32px 0;" />
-          <p style="color: #aaa; font-size: 12px;">ReadIn · Your personal reading platform</p>
-        </div>
-      `,
+      subject: mail.subject,
+      html: mail.html,
+      text: mail.text,
     })
+    // Resend reports problems (unverified domain, bad key…) in `error`, it does not throw.
+    if (error) throw new Error(`Resend: ${error.message}`)
   }
 
-  async sendPasswordResetEmail(
-    to: string,
-    name: string,
-    token: string,
-  ): Promise<void> {
-    const resetUrl = `${this.appUrl}/reset-password?token=${token}`
-
-    await this.client.emails.send({
-      from: this.from,
-      to,
-      subject: 'Reset your ReadIn password',
-      html: `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; color: #1a1a2e;">
-          <h1 style="font-size: 24px; margin-bottom: 8px;">Password Reset Request</h1>
-          <p style="color: #555; line-height: 1.6;">Hi ${name}, we received a request to reset your ReadIn password.</p>
-          
-            href="${resetUrl}"
-            style="display: inline-block; margin: 24px 0; padding: 14px 28px; background: #6c63ff; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;"
-          >
-            Reset Password
-          </a>
-          <p style="color: #888; font-size: 13px;">This link expires in <strong>1 hour</strong>. If you didn't request a password reset, ignore this email — your password won't change.</p>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 32px 0;" />
-          <p style="color: #aaa; font-size: 12px;">ReadIn · Your personal reading platform</p>
-        </div>
-      `,
-    })
+  /** Pages (not API JSON) — see routes/pages.routes.ts */
+  sendVerificationEmail(to: string, name: string, token: string): Promise<void> {
+    return this.send(to, verificationEmail(name, `${this.appUrl}/verify-email?token=${encodeURIComponent(token)}`))
   }
 
-  async sendWelcomeEmail(to: string, name: string): Promise<void> {
-    await this.client.emails.send({
-      from: this.from,
-      to,
-      subject: "You're verified — welcome to ReadIn! 📚",
-      html: `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; color: #1a1a2e;">
-          <h1 style="font-size: 24px; margin-bottom: 8px;">You're all set, ${name}! 🎉</h1>
-          <p style="color: #555; line-height: 1.6;">Your email has been verified and your ReadIn account is ready.</p>
-          <p style="color: #555; line-height: 1.6;">Here's what you can do:</p>
-          <ul style="color: #555; line-height: 2;">
-            <li>Upload PDFs and convert them to EPUB for a better reading experience</li>
-            <li>Read with highlights, bookmarks, and personal notes</li>
-            <li>Discover thousands of free public domain books</li>
-            <li>Listen with built-in text-to-speech audio</li>
-          </ul>
-          <p style="color: #555;">Happy reading!</p>
-          <p style="color: #888; font-size: 13px;">— The ReadIn Team</p>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 32px 0;" />
-          <p style="color: #aaa; font-size: 12px;">ReadIn · Your personal reading platform</p>
-        </div>
-      `,
-    })
+  sendPasswordResetEmail(to: string, name: string, token: string): Promise<void> {
+    return this.send(to, passwordResetEmail(name, `${this.appUrl}/reset-password?token=${encodeURIComponent(token)}`))
+  }
+
+  sendWelcomeEmail(to: string, name: string): Promise<void> {
+    return this.send(to, welcomeEmail(name))
+  }
+
+  sendPasswordChangedEmail(to: string, name: string): Promise<void> {
+    return this.send(to, passwordChangedEmail(name))
+  }
+
+  sendPaymentReceiptEmail(input: Parameters<IEmailProvider['sendPaymentReceiptEmail']>[0]): Promise<void> {
+    return this.send(
+      input.to,
+      receiptEmail({
+        name: input.name,
+        planName: input.planName,
+        amountText: formatNaira(input.amountKobo),
+        reference: input.reference,
+        paidAt: input.paidAt,
+        premiumUntil: input.premiumUntil,
+      }),
+    )
   }
 }

@@ -6,6 +6,7 @@ import {
   refreshToken,
   logout,
   verifyEmail,
+  resendVerification,
   forgotPassword,
   resetPassword,
 } from '../controllers/auth.controller.js'
@@ -18,6 +19,7 @@ router.post('/google', googleOAuth)
 router.post('/refresh', refreshToken)
 router.post('/logout', logout)
 router.get('/verify-email/:token', verifyEmail)
+router.post('/resend-verification', resendVerification)
 router.post('/forgot-password', forgotPassword)
 router.post('/reset-password', resetPassword)
 

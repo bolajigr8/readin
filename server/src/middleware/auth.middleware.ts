@@ -1,16 +1,20 @@
 import type { Request, Response, NextFunction } from 'express'
 import { verifyAccessToken } from '../utils/jwt.utils.js'
 import { errorResponse } from '../utils/response.utils.js'
+import { User } from '../models/user.model.js'
+import { effectivePlan } from '../services/billing.logic.js'
 
 /**
  * protect — verifies the Bearer access token and attaches `req.user`.
- * Must be applied before any handler that needs authentication.
+ * The plan and the "disabled" flag are read from the DATABASE on every request
+ * (not trusted from the 15-minute token), so a payment, an expiry or an admin
+ * action takes effect immediately.
  */
-export const protect = (
+export const protect = async (
   req: Request,
   res: Response,
   next: NextFunction,
-): void => {
+): Promise<void> => {
   const authHeader = req.headers.authorization
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -24,12 +28,30 @@ export const protect = (
 
   const token = authHeader.slice(7) // strip "Bearer "
 
+  let userId: string
   try {
-    const decoded = verifyAccessToken(token)
-    req.user = { userId: decoded.userId, plan: decoded.plan }
-    next()
+    userId = verifyAccessToken(token).userId
   } catch {
     errorResponse(res, 'Invalid or expired access token.', 401)
+    return
+  }
+
+  try {
+    const u = await User.findById(userId).select('plan premiumUntil disabled').lean()
+    if (!u || u.disabled === true) {
+      errorResponse(res, 'Invalid or expired access token.', 401)
+      return
+    }
+    const stored = u.plan === 'premium' ? 'premium' : 'free'
+    const plan = effectivePlan(stored, u.premiumUntil ?? null, new Date())
+    if (stored === 'premium' && plan === 'free') {
+      // paid period is over → store it (best effort)
+      User.updateOne({ _id: u._id, plan: 'premium' }, { $set: { plan: 'free' } }).catch(() => undefined)
+    }
+    req.user = { userId, plan }
+    next()
+  } catch (err) {
+    next(err)
   }
 }
 
