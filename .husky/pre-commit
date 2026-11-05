@@ -1,8 +1,19 @@
-cd server
-pnpm exec lint-staged
-pnpm run typecheck
-cd ..
+# ReadIn pre-commit hook — fast checks, only for the parts of the repo you changed.
+# (Full checks: tool/verify.sh)
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
 
-cd mobile
-pnpm run lint
-cd ..
+if printf '%s\n' "$staged" | grep -q '^server/'; then
+  echo "pre-commit: server → lint-staged (eslint --fix) + typecheck"
+  pnpm exec lint-staged || exit 1          # config: server/package.json "lint-staged"
+  (cd server && pnpm run typecheck) || exit 1
+fi
+
+if printf '%s\n' "$staged" | grep -q '^admin/'; then
+  echo "pre-commit: admin → tsc --noEmit"
+  (cd admin && pnpm exec tsc --noEmit) || exit 1
+fi
+
+if printf '%s\n' "$staged" | grep -qE '^mobile/.*\.dart$|^mobile/pubspec\.yaml$|^mobile/analysis_options\.yaml$'; then
+  echo "pre-commit: mobile → flutter analyze"
+  (cd mobile && flutter analyze) || exit 1
+fi

@@ -22,7 +22,7 @@ keytool -list -v -keystore ~/readin-keys/readin-release.jks -alias readin
 Back up the `.jks` and both passwords in two separate offline places. 10 000 days ≈ 27 years (Play requires validity well beyond 2033).
 
 ### 2.2 Wire it (Claude Code, S1)
-* `flutter/readin_flutter/android/key.properties` (git-ignored):
+* `project/mobile/android/key.properties` (git-ignored by `project/mobile/android/.gitignore`):
   `storePassword=… keyPassword=… keyAlias=readin storeFile=C:/Users/MICBOL/readin-keys/readin-release.jks`
 * `android/app/build.gradle.kts` already reads `key.properties` but **silently falls back to the debug key** → change so a *release* build **fails** without the key (allow an explicit opt-out property for local testing only). **Any APK given to real users must be signed with the release key.** Debug-key APKs already installed on test phones cannot be updated by release-signed APKs (uninstall once).
 * Record here after S1: `Release certificate SHA-256: ____`  `SHA-1: ____`  `First release date: ____`.

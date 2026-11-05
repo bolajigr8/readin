@@ -10,8 +10,10 @@ Read the root `CLAUDE.md` first. This file = server specifics.
 pnpm install
 pnpm run dev            # nodemon
 pnpm run typecheck      # tsc --noEmit  (must be clean)
-pnpm run lint           # eslint
+pnpm run lint           # eslint — must show 0 errors (warnings allowed). Global `ignores` must be its own config object.
 for t in tests/*.test.mjs; do node --experimental-strip-types "$t"; done
+pnpm run test:e2e       # tests/e2e/run.mjs: real server (tsx) + in-memory MongoDB + fake Paystack/Resend + dead Redis (22 tests, ~15 s;
+                        # first run downloads MongoDB ~650 MB). Never loads server/.env (DOTENV_CONFIG_PATH → tests/e2e/e2e.env).
 npx tsx src/scripts/create-admin.ts     # env ADMIN_EMAIL / ADMIN_PASSWORD / ADMIN_NAME
 npx tsx src/scripts/remove-test-users.ts [--confirm]   # NEVER `pnpm seed` on production
 ```
@@ -33,6 +35,8 @@ Local run needs a `.env` (copy `.env.example`; **never read/print/commit it**). 
 
 ## Env vars (names only; set on Render / local `.env`)
 Core: `NODE_ENV PORT MONGODB_URI JWT_SECRET JWT_REFRESH_SECRET CLIENT_ORIGIN APP_URL` · Redis: `UPSTASH_REDIS_URL REDIS_COMMAND_TIMEOUT_MS REDIS_BREAKER_MS` · Rate limits: `RATE_LIMIT_WINDOW_MS RATE_LIMIT_MAX_GENERAL RATE_LIMIT_MAX_AUTH RATE_LIMIT_MAX_UPLOAD RATE_LIMIT_MAX_SYNC RATE_LIMIT_MAX_ADMIN` · Mail: `RESEND_API_KEY EMAIL_FROM` · Files: `CLOUDINARY_CLOUD_NAME CLOUDINARY_API_KEY CLOUDINARY_API_SECRET TEMP_DIR MAX_CONVERSION_CONCURRENT CONVERSION_ENABLED` · Payments: `PAYSTACK_SECRET_KEY` (+ test-only `PAYSTACK_BASE_URL`), `REVENUECAT_WEBHOOK_SECRET` (unused) · Admin: `ADMIN_EMAILS` · Google: `GOOGLE_CLIENT_ID GOOGLE_CLIENT_IDS`. **Add every new variable to `.env.example` and `render.yaml` (`sync:false`).**
+Fixed 2026-11-05 (S0.3): render.yaml lists every secret name (`sync:false`), `.env.example` has one `APP_URL` + the optional tuning names, the Dockerfile pins `pnpm@10.28.1`.
+E-mails are sent in the background after the response (fire-and-forget) — tests must wait for them. Pre-commit hook runs `eslint --fix` (not prettier: `.prettierrc` wants semicolons but most files have none — don't mass-reformat).
 
 ## When you add things
 New model/route → controller + zod validation + auth/permission + audit (admin) + rate limit scope + test + `.env.example`/docs. Pure logic goes in `*.logic.ts` with a `tests/*.test.mjs`. Schema changes affecting existing users need a migration script in `src/scripts/` that is idempotent, plus a Mongo Atlas backup reminder to Michael. Keep API responses backward compatible with already-installed app versions (APKs in the wild cannot be force-updated instantly).

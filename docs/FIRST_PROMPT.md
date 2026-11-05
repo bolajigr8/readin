@@ -1,11 +1,15 @@
 # How to start Claude Code (copy/paste)
 
-## One-time setup (5 minutes)
+> Status 2026-11-05: setup done and the first session ran. Real layout: `Book-App/{CLAUDE.md,.claude/,project/}`,
+> app in `project/mobile` (its `CLAUDE.md` is there now). For new sessions use the "Never lose the conversation"
+> section below and `/resume`. The setup steps are kept for reference only.
+
+## One-time setup (5 minutes) — done
 1. Extract this pack so that the files land in your real folders:
-   `CLAUDE.md`, `.claude/` and `flutter/` go next to your two project folders inside `Book-App/`;
-   `project/docs/…`, `project/server/CLAUDE.md`, `project/admin/CLAUDE.md` go inside your existing `project/`.
+   `CLAUDE.md` and `.claude/` go into the inner `Book-App/` folder (next to `project/`);
+   `project/docs/…`, `project/server/CLAUDE.md`, `project/admin/CLAUDE.md`, `project/mobile/CLAUDE.md` go inside your existing `project/`.
    (If a `CLAUDE.md` already exists in a folder, keep both: merge by hand.)
-2. In Git Bash: `cd "C:/Users/MICBOL/Desktop/React-Native/New-Projects/Book-App"` then run `claude`.
+2. In Git Bash: `cd "C:/Users/MICBOL/Desktop/React-Native/New-Projects/Book-App/Book-App"` (the inner folder) then run `claude`.
 3. First time only, inside Claude Code run `/permissions` and check that reading `.env`, `key.properties` and `*.jks` is denied (the pack's `.claude/settings.json` does this).
 4. Commit the new docs: `cd project && git add docs server/CLAUDE.md admin/CLAUDE.md && git commit -m "docs: Claude Code context pack"`.
 

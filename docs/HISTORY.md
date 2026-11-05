@@ -30,7 +30,7 @@ the server and admin were really built/tested there. **You (Claude Code) can run
 ## 3. Verified-by-test facts (so you know what is trustworthy)
 * Server: real `tsc` clean; unit tests billing 10, entitlements 14, revenuecat 8; a full end-to-end script (real MongoDB + Redis, fake Paystack/Resend) passed **92/92** — covers register/confirm/reset e-mails & pages, plans, checkout, exactly-once settlement even with 3 concurrent paths, webhook signature, amount mismatch, expiry, admin endpoints, rate limits, Redis outage fail-open. That script lived only in the sandbox (`/tmp/e2e2`) → **recreating it as a committed integration test is roadmap item S0.4.**
 * Admin: real `next build` + a mock-API end-to-end (login, httpOnly cookies, whitelist, CSRF, refresh) + screenshots.
-* Reader: Playwright/Chromium harness with a generated test EPUB measured computed styles for every setting, font loading, page-turn animation (15 monotonic scroll steps, same final pages as instant mode, 60 pages across a chapter boundary). **Recreate it under `flutter/readin_flutter/tool/reader_harness/` (S0.5)** if you change `reader.html`.
+* Reader: Playwright/Chromium harness with a generated test EPUB measured computed styles for every setting, font loading, page-turn animation (15 monotonic scroll steps, same final pages as instant mode, 60 pages across a chapter boundary). **Recreate it under `project/mobile/tool/reader_harness/` (S0.5)** if you change `reader.html`.
 * Flutter code was never compiled by the previous assistant. Trust `flutter analyze`/`flutter test` results from your machine over anything written here.
 
 ## 4. Production facts
@@ -38,7 +38,7 @@ the server and admin were really built/tested there. **You (Claude Code) can run
 * Paystack dashboard: webhook `https://readin-ehzw.onrender.com/api/v1/webhooks/paystack`; callback `https://readin-ehzw.onrender.com/payment/callback`.
 * Admin on Vercel: Root Directory `admin`, env `API_URL=https://readin-ehzw.onrender.com/api/v1`.
 * Admin accounts: created with `npx tsx src/scripts/create-admin.ts` (env `ADMIN_EMAIL`, `ADMIN_PASSWORD`); the API ALSO requires the e-mail to be in `ADMIN_EMAILS` (second lock). Demo `@readin.test` users must be removed from prod (`remove-test-users.ts --confirm`). **Never run `seed` on prod.**
-* Icons: `lib/constants/ionicons.dart` + the font block in `pubspec.yaml` are generated locally from the real Ionicons font by `tool/gen_ionicons.dart` (command in `flutter/readin_flutter/COMMANDS.md`); the zip ships a Material-icon shim.
+* Icons: `lib/constants/ionicons.dart` + the font block in `pubspec.yaml` are generated locally from the real Ionicons font by `tool/gen_ionicons.dart` (command in `project/mobile/COMMANDS.md`). Current state (2026-11-05): the committed `ionicons.dart` is a hand-kept Material-icon shim, there is no Ionicons font block in `pubspec.yaml` and `assets/fonts/Ionicons.ttf` is not in the repo.
 * Test device: Samsung SM-A175F. Flutter 3.47.6 / Dart 3.13.5 / Gradle 9.3.1 / Android SDK 37 (licences may need `flutter doctor --android-licenses`).
 
 ## 5. Michael's open requests (as of this file)
@@ -46,3 +46,20 @@ See `ROADMAP.md` — APK release + versioning + landing page, Firebase Analytics
 
 ## 6. Session log
 (Append new entries below via `/handoff`.)
+
+### 2026-11-05 — onboarding (first Claude Code session) · stage: pre-S0
+* **Layout truth**: app = `project/mobile` (Flutter, pubspec `readin_flutter`, tracked in git); `flutter/readin_flutter` never held the app. Expo leftovers only: `app.json`, `eas.json`, lint-staged/husky `mobile` lines, `server/expo-app-details.txt`, Expo text in `README.md`.
+* **Changed**: commit `160094b` = snapshot of all uncommitted v4–v9 work (67 added, 148 deleted = unused ios/linux/macos/web/windows, 98 modified). Docs only otherwise: paths fixed in root/sub CLAUDE.md, `.claude/commands`, ROADMAP, HISTORY, MANUAL_TASKS, PLAY_AND_DISTRIBUTION, DECISIONS (8–11), FIRST_PROMPT, NEXT; app CLAUDE.md moved to `project/mobile/`.
+* **No new env vars, packages or tests.**
+* **True baseline**: server typecheck ✅, unit tests 32 ✅ (billing 10, entitlements 14, revenuecat 8), lint ❌ (1145 errors, 1137 from `dist/`); admin tsc ✅, lint ✅ (1 warning), build ✅, proxy 7 ✅; flutter analyze ✅, tap-zones 4 ✅, viewer-core 9 ✅, audit_dart ❌ (Windows console encoding; 1 finding `Ionicons._`); flutter test ❌ (no MSVC for `pdfium_dart` hook); release APK ✅ but debug-signed.
+* **Secret scan** of every commit: clean (placeholders only). Root `.gitignore` covers only `.env` (gap → S0.3).
+* **Gotchas**: ESLint `ignores` inside a rules object is not global; `audit_dart.py` needs `PYTHONIOENCODING=utf-8`; first release build takes ~22 min; `flutter_tts` applies KGP (future Flutter will refuse); husky hook dormant until root `pnpm install`, then it would block every commit.
+* **Left undone**: all of S0 (awaiting go), `flutter test` run, real-device tests.
+
+### 2026-11-05 — stage S0 (baseline, hygiene, tests)
+* **Changed**: `mobile/ios/` restored (template); server `eslint.config.mjs` (global ignores, test globals), `calibre.service.ts` (error cause); `mobile/tool/audit_dart.py` (Windows UTF-8 + path fix — `Ionicons._` was a false positive); root/admin `.gitignore`; Expo files removed (tag `expo-legacy`); husky hook rewritten; root lint-staged removed, server lint-staged = `pnpm --dir server exec eslint --fix`; README; Dockerfile pnpm pin; render.yaml + `.env.example` names; `mobile/lib/app/access_refresh.dart` (+ `app.dart` uses it, same behaviour); `tool/verify.sh`.
+* **Tests added**: server e2e `tests/e2e/run.mjs` **22** (`pnpm run test:e2e`); reader harness `mobile/tool/reader_harness/harness.mjs` **17** (installed Edge/Chrome); app `test/features/access_refresh_test.dart` **8** (written, not run yet).
+* **New dev packages**: `mongodb-memory-server` ^11.3.0 (server), `playwright-core` 1.56.1 (reader harness only). No new env vars (test-only `RESEND_BASE_URL` is read by the Resend SDK itself).
+* **True counts now**: server unit 32 + e2e 22; admin proxy 7; app JS 4 + 9; reader 17; flutter test still blocked (VS C++).
+* **Gotchas**: server sends e-mails after responding (tests must wait); `dotenv/config` would load the real `server/.env` into a test server — use `DOTENV_CONFIG_PATH`; MongoDB download is ~650 MB on Windows; lint-staged runs from the repo root and can't find `server/node_modules/.bin` on Windows; `.prettierrc` disagrees with the code style (prettier kept out of the hook); lint-staged backup/restore rewrites line endings (harmless).
+* **Left**: S0.2 (Michael), run S0.6 test after VS C++, rebuild APK once (`verify.sh --apk`), commit + push (+ tag).

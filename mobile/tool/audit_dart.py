@@ -5,6 +5,10 @@ Checks: import resolution · package deps in pubspec · symbols used but not imp
 Usage: python3 audit_dart.py <project root>"""
 import os, re, sys, glob
 
+# Windows consoles default to cp1252, which cannot print the ✗ mark.
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+
 root = sys.argv[1] if len(sys.argv) > 1 else '.'
 PKG = 'readin_flutter'
 problems = []
@@ -47,7 +51,7 @@ def resolve(f, target):
         return 'pkg:' + pkg
     return os.path.normpath(os.path.join(os.path.dirname(f), target))
 
-pubspec = open(os.path.join(root, 'pubspec.yaml')).read()
+pubspec = open(os.path.join(root, 'pubspec.yaml'), encoding='utf-8').read()
 deps = set(re.findall(r'^  ([a-z_0-9]+):', pubspec, re.M))
 sdk_ok = {'flutter', 'flutter_test', 'flutter_localizations'}
 
@@ -196,7 +200,7 @@ for f in files:
             for p in split_top(named_part, True):
                 p = p.strip()
                 if not p: continue
-                p2 = re.split(r'(?<![=!<>])=(?![=>])', p, 1)[0]
+                p2 = re.split(r'(?<![=!<>])=(?![=>])', p, maxsplit=1)[0]
                 words = re.findall(r'\w+', p2)
                 if words:
                     nm = words[-1]; named.add(nm)
@@ -266,10 +270,10 @@ for f in [x for x in files if not x.startswith('tool')]:
         if not os.path.exists(p): bad(f, f"asset not found: {m.group(1)}")
 
 # ── Ionicons names
-shim = open(os.path.join(root, 'lib/constants/ionicons.dart')).read()
+shim = open(os.path.join(root, 'lib/constants/ionicons.dart'), encoding='utf-8').read()
 have = set(re.findall(r'static const IconData (\w+) =', shim))
 for f in files:
-    if f.endswith('constants/ionicons.dart'): continue
+    if f.replace(os.sep, '/').endswith('constants/ionicons.dart'): continue  # Windows paths use backslashes
     for n in set(re.findall(r'Ionicons\.([a-z_0-9]+)', code[f])):
         if n not in have: bad(f, f"Ionicons.{n} missing from the icon file")
 

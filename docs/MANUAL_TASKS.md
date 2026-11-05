@@ -6,7 +6,7 @@
 3. **Create and back up the release keystore** (after Claude Code explains the command in S1): two offline copies (e.g. encrypted USB + password manager), store the passwords separately. Losing it = no more updates for installed users.
 
 ## Accounts / consoles
-* **Firebase**: create project "ReadIn", add Android app `com.micbol.readin` (add SHA-1 and SHA-256 of the release key, and of the debug key for testing), download `google-services.json` into `flutter/readin_flutter/android/app/` (never commit if the plan says so), turn on Analytics + Crashlytics; DebugView for testing (`adb shell setprop debug.firebase.analytics.app com.micbol.readin`).
+* **Firebase**: create project "ReadIn", add Android app `com.micbol.readin` (add SHA-1 and SHA-256 of the release key, and of the debug key for testing), download `google-services.json` into `project/mobile/android/app/` (never commit if the plan says so), turn on Analytics + Crashlytics; DebugView for testing (`adb shell setprop debug.firebase.analytics.app com.micbol.readin`).
 * **GitHub**: create public repo `readin-releases` (APK hosting) — or a Cloudflare R2 bucket.
 * **Vercel**: second project for the landing page (Root Directory `site`); keep the admin project separate. (Reminder: Vercel's free Hobby plan is for non-commercial use — check their terms; Pro or Cloudflare Pages are the compliant options for a business.)
 * **Render**: add env vars as each stage says (never paste secrets in chat or commits): `RELEASE_HOST_ALLOWLIST`, `GA4_*` (optional), keep `PAYSTACK_SECRET_KEY`, `APP_URL`, `ADMIN_EMAILS`.

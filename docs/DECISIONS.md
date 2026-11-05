@@ -21,4 +21,11 @@
 ## ❓ Open
 * Custom domain for the landing page / admin / API (affects Paystack URLs, privacy policy URL, deep links)? Until decided use the Vercel and Render URLs.
 * Individual Play account needs Nigeria-supported **merchant (payments) profile** for Play Billing — Michael to check in Play Console once verified.
-* Do we keep the legacy `project/mobile` (old Expo app) in the repo? Recommend archiving it in a branch/tag and deleting from `main` (it triggers the husky `mobile` lint on every commit).
+* ~~Do we keep the legacy `project/mobile` (old Expo app)?~~ Resolved 2026-11-05: `project/mobile` IS the Flutter app; see decisions 8–11.
+
+## ✅ Decided 2026-11-05 (first Claude Code session)
+8. **Real layout**: the Flutter app lives in `project/mobile` (pubspec name `readin_flutter`); there is no `flutter/readin_flutter`. All docs updated.
+9. **Snapshot commit** of all uncommitted v4–v9 work (incl. removal of the unused linux/macos/web/windows folders) made by Claude Code: `160094b`.
+10. **Expo leftovers**: tag `expo-legacy`, then delete `app.json`, `eas.json`, `server/expo-app-details.txt`, the lint-staged `mobile` entry; rewrite `project/README.md` (S0.3).
+11. **Husky pre-commit**: keep husky, rewrite the hook — server lint-staged + typecheck; admin `tsc` when admin files are staged; `flutter analyze` when mobile files are staged (S0.3).
+12. **iOS kept possible**: `mobile/ios/` restored from `a2ae276` (Flutter template, placeholder bundle id). Android stays first; an iPhone version is a future stage (Swift ports of the native features, Mac + Apple Developer account).

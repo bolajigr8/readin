@@ -1,4 +1,5 @@
 import '../features/billing/billing_providers.dart';
+import 'access_refresh.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -44,9 +45,12 @@ class _ReadInAppState extends ConsumerState<ReadInApp> with WidgetsBindingObserv
 
   // Feature access / plan / payment switch: re-read often so an admin change shows up
   // within about a minute (it used to wait up to 8 minutes, or a sign-out).
-  Timer? _accessTimer;
-  DateTime? _lastAccess;
-  bool _foreground = true;
+  // Timing rules (45 s while open, on resume, max once per 15 s) live in
+  // AccessRefreshScheduler so they can be tested.
+  late final AccessRefreshScheduler _access = AccessRefreshScheduler(
+    isAllowed: () => ref.read(authProvider).isAuthenticated,
+    onRefresh: _refreshAccess,
+  );
 
   @override
   void initState() {
@@ -57,36 +61,30 @@ class _ReadInAppState extends ConsumerState<ReadInApp> with WidgetsBindingObserv
       _wakeServer();
       _onIncoming(await NativeFiles.takeIncoming()); // cold start via Share
     });
-    _accessTimer = Timer.periodic(const Duration(seconds: 45), (_) {
-      if (_foreground) _refreshAccess();
-    });
+    _access.start();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _incomingSub?.cancel();
-    _accessTimer?.cancel();
+    _access.stop();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    _foreground = state == AppLifecycleState.resumed;
+    _access.setForeground(state == AppLifecycleState.resumed);
     if (state == AppLifecycleState.resumed) {
       _wakeServer();
-      _refreshAccess(); // right away when the app comes back (at most every 15 s)
+      _access.request(); // right away when the app comes back (at most every 15 s)
     }
   }
 
   /// Light refresh: the user's plan, feature access and the payment switch.
   /// (The heavier shelves / habits pull stays in [_refreshRemote].)
+  /// Called by [_access] (signed-in check and 15 s throttle happen there).
   void _refreshAccess() {
-    if (!ref.read(authProvider).isAuthenticated) return;
-    final now = DateTime.now();
-    final last = _lastAccess;
-    if (last != null && now.difference(last).inSeconds < 15) return;
-    _lastAccess = now;
     unawaited(() async {
       await ref.read(publicConfigProvider.notifier).refresh();
       await ref.read(refreshUserProvider)();
