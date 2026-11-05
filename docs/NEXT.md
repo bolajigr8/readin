@@ -1,31 +1,28 @@
 # NEXT — where we are right now (Claude Code keeps this current)
 
-**Updated:** 2026-11-05 (late)   **Current stage:** S0 done except S0.2 (Michael) and running the S0.6 test (needs VS C++). Log: `sessions/2026-11-05-s0.md`.
+**Updated:** 2026-11-06   **Current stage:** S0 — committed (`c613013`), waiting for Michael's Visual Studio C++ install
+to run `flutter test`. Latest log: `sessions/2026-11-06-vs-tools.md` (section "WHERE WE STOPPED").
 
 ## Done
-- Onboarding (log `sessions/2026-11-05-onboarding.md`): layout verified (app = `project/mobile`), docs fixed, snapshot commit `160094b`.
-- `mobile/ios/` restored (Michael's request — keep iPhone possible; template only).
-- S0.1 server lint 0 errors (was 1145); audit_dart works on Windows, 0 problems.
-- S0.3 `.gitignore` hardened; tag `expo-legacy`; Expo files removed; husky hook rewritten and tested; README rewritten;
-  Dockerfile pins pnpm 10.28.1; render.yaml + 5 env names; `.env.example` cleaned.
-- S0.4 server e2e `pnpm run test:e2e` — 22/22 (in-memory MongoDB, fake Paystack/Resend, Redis down).
-- S0.5 reader harness `mobile/tool/reader_harness` — 17/17 in Edge.
-- Final `bash tool/verify.sh --e2e --reader`: all PASS except `flutter test` (VS C++).
-- S0.7 `tool/verify.sh` (+ `--apk --e2e --reader --only`).
+- Onboarding (2026-11-05): real layout (app = `project/mobile`), docs fixed, snapshot commit `160094b`.
+- S0 (2026-11-05, committed 2026-11-06 as `c613013`, NOT pushed): server lint 0 errors; audit_dart fixed; `.gitignore`
+  hardened; Expo files removed (tag `expo-legacy`, local); husky hook rewritten; `tool/verify.sh`; server e2e 22/22;
+  reader harness 17/17; AccessRefreshScheduler + test (not run yet); `mobile/ios/` template restored.
+- Last full check: `bash tool/verify.sh --e2e --reader` → all PASS except `app: flutter test` (needed VS C++).
 
 ## Half-done / in progress
-- S0.6 propagation test written + analyze-clean, **not run** (needs VS C++ for `flutter test`).
-- S0.2 Paystack 403 — waits for Michael (deploy + Billing → Test connection).
-- S0 committed on 2026-11-06 by Claude Code at Michael's request (see `git log`); NOT pushed — Michael pushes.
+- Michael is installing **Build Tools for Visual Studio 2026 → "Desktop development with C++"**.
+- S0.6 test written, not run. S0.2 Paystack 403 waits for Michael (deploy + Billing → Test connection).
 
 ## Next 3 steps
-1. Michael: install VS 2022 "Desktop development with C++" → `bash tool/verify.sh` (runs the new access_refresh test too).
-2. Michael: review + commit S0; push; deploy server; Billing → Test connection; paste the result line (never the key).
-3. Then `/stage S1` (signing — needs Michael to create the keystore).
+1. After the install: new Git Bash → `flutter doctor` (Visual Studio ✓) → `cd project && bash tool/verify.sh --apk`.
+2. If all PASS: tick S0.1 + S0.6 in ROADMAP, record the Flutter test count. Michael: `git push && git push origin expo-legacy`,
+   deploy, Billing → Test connection, paste the result line (never the key).
+3. `/stage S1` (release signing — Michael creates the keystore with the command Claude Code gives).
 
 ## Open questions for Michael
 - None blocking.
 
 ## Reminders
 - All APKs so far are DEBUG-signed. Phones with a debug build must uninstall once when S1 lands (local-only books lost) — warn testers.
-- Push the new tag too: `git push origin expo-legacy`.
+- To continue a conversation: `claude --continue` from the inner `Book-App` folder; or start `claude` and type `/resume`.
