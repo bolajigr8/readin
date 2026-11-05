@@ -63,3 +63,7 @@ See `ROADMAP.md` — APK release + versioning + landing page, Firebase Analytics
 * **True counts now**: server unit 32 + e2e 22; admin proxy 7; app JS 4 + 9; reader 17; flutter test still blocked (VS C++).
 * **Gotchas**: server sends e-mails after responding (tests must wait); `dotenv/config` would load the real `server/.env` into a test server — use `DOTENV_CONFIG_PATH`; MongoDB download is ~650 MB on Windows; lint-staged runs from the repo root and can't find `server/node_modules/.bin` on Windows; `.prettierrc` disagrees with the code style (prettier kept out of the hook); lint-staged backup/restore rewrites line endings (harmless).
 * **Left**: S0.2 (Michael), run S0.6 test after VS C++, rebuild APK once (`verify.sh --apk`), commit + push (+ tag).
+
+### 2026-11-06 — S0 merged, Paystack confirmed
+* PR #1 (S0) merged by Michael; Render redeployed. Admin Billing → Test connection: **"Connected. Paystack accepted the key."** — the 403/firewall problem from §2 is resolved in production (S0.2 done). Full checkout not yet exercised live (S10).
+* Git workflow: branches `feat/ fix/ chore/ docs/ refactor/ test/` → PR → Michael merges (DECISIONS #13); direct pushes to `main` are rejected by GitHub (`commit_refs_rules`).

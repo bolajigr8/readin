@@ -12,12 +12,12 @@ to run `flutter test`. Latest log: `sessions/2026-11-06-vs-tools.md` (section "W
 
 ## Half-done / in progress
 - Michael is installing **Build Tools for Visual Studio 2026 → "Desktop development with C++"**.
-- S0.6 test written, not run. S0.2 Paystack 403 waits for Michael (deploy + Billing → Test connection).
+- S0.6 test written, not run (needs VS C++).
+- S0.2 DONE 2026-11-06: Paystack Test connection → "Connected. Paystack accepted the key." (403 gone; a real test payment is S10).
 
 ## Next 3 steps
 1. After the install: new Git Bash → `flutter doctor` (Visual Studio ✓) → `cd project && bash tool/verify.sh --apk`.
-2. If all PASS: tick S0.1 + S0.6 in ROADMAP, record the Flutter test count. Michael: merge the `chore/s0-baseline` pull request, push the tag (`git push origin expo-legacy`),
-   deploy, Billing → Test connection, paste the result line (never the key).
+2. If all PASS: tick S0.1 + S0.6 in ROADMAP, record the Flutter test count. Michael: merge the `chore/s0-baseline` pull request, push the tag (`git push origin expo-legacy`).
 3. `/stage S1` (release signing — Michael creates the keystore with the command Claude Code gives).
 
 ## Open questions for Michael
