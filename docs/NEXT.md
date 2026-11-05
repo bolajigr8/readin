@@ -16,7 +16,7 @@ to run `flutter test`. Latest log: `sessions/2026-11-06-vs-tools.md` (section "W
 
 ## Next 3 steps
 1. After the install: new Git Bash → `flutter doctor` (Visual Studio ✓) → `cd project && bash tool/verify.sh --apk`.
-2. If all PASS: tick S0.1 + S0.6 in ROADMAP, record the Flutter test count. Michael: `git push && git push origin expo-legacy`,
+2. If all PASS: tick S0.1 + S0.6 in ROADMAP, record the Flutter test count. Michael: merge the `claude/s0-baseline` pull request, push the tag (`git push origin expo-legacy`),
    deploy, Billing → Test connection, paste the result line (never the key).
 3. `/stage S1` (release signing — Michael creates the keystore with the command Claude Code gives).
 
