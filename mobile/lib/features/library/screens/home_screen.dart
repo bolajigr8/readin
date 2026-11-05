@@ -1,3 +1,4 @@
+import '../../habits/habits_card.dart';
 import '../../shelves/widgets/shelf_widgets.dart';
 import 'dart:math' as math;
 
@@ -24,7 +25,12 @@ import '../widgets/book_card.dart';
 import '../widgets/continue_reading_banner.dart';
 
 /// Opens the reader for [book] (book object passed via `extra`).
+/// Tapping a book shows its About page first (cover, summary, READ / listen).
 void openBook(BuildContext context, Book book) =>
+    context.push(AppRoutes.aboutPath(book.id), extra: book);
+
+/// Straight into the reader (Continue Reading).
+void readBookNow(BuildContext context, Book book) =>
     openBookWith(GoRouter.of(context), book);
 
 /// UI_SPEC §4.5 — Home tab.
@@ -119,6 +125,8 @@ class HomeScreen extends ConsumerWidget {
                     const ReadingGoalCard(),
                     const SizedBox(height: 12),
                     const ChallengeCard(),
+                    const SizedBox(height: 12),
+                    const HabitsHomeCard(),
 
                     // Continue reading
                     if (continueReading.isNotEmpty) ...[
@@ -133,7 +141,7 @@ class HomeScreen extends ConsumerWidget {
                       const SizedBox(height: 14),
                       ContinueReadingBanner(
                         book: continueReading.first,
-                        onTap: () => openBook(context, continueReading.first),
+                        onTap: () => readBookNow(context, continueReading.first),
                       ),
                     ],
 

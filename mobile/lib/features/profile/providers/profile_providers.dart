@@ -34,6 +34,7 @@ class AppSettings {
     required this.defaultTheme,
     required this.notificationsEnabled,
     required this.autoDownloadEpub,
+    this.openLastBook = true,
   });
 
   final double defaultFontSize;
@@ -42,18 +43,21 @@ class AppSettings {
   final String defaultTheme;
   final bool notificationsEnabled;
   final bool autoDownloadEpub;
+  final bool openLastBook;
 
   AppSettings copyWith({
     double? defaultFontSize,
     String? defaultTheme,
     bool? notificationsEnabled,
     bool? autoDownloadEpub,
+    bool? openLastBook,
   }) =>
       AppSettings(
         defaultFontSize: defaultFontSize ?? this.defaultFontSize,
         defaultTheme: defaultTheme ?? this.defaultTheme,
         notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
         autoDownloadEpub: autoDownloadEpub ?? this.autoDownloadEpub,
+        openLastBook: openLastBook ?? this.openLastBook,
       );
 }
 
@@ -66,6 +70,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
             notificationsEnabled:
                 _ref.read(storageServiceProvider).notificationsEnabled,
             autoDownloadEpub: _ref.read(storageServiceProvider).autoDownloadEpub,
+            openLastBook: _ref.read(storageServiceProvider).openLastBook,
           ),
         );
 
@@ -90,6 +95,11 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   void setNotifications(bool v) {
     state = state.copyWith(notificationsEnabled: v);
     unawaited(_ref.read(storageServiceProvider).setNotificationsEnabled(v));
+  }
+
+  void setOpenLastBook(bool v) {
+    state = state.copyWith(openLastBook: v);
+    unawaited(_ref.read(storageServiceProvider).setOpenLastBook(v));
   }
 
   void setAutoDownload(bool v) {

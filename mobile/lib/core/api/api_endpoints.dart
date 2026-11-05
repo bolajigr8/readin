@@ -23,6 +23,14 @@ class ApiEndpoints {
   static String libraryBook(String id) => '/library/$id';
   static const String libraryDiscover = '/library/discover';
   static const String libraryLocal = '/library/local';
+  static const String featuresMe = '/features/me';
+  static const String publicConfig = '/config/public';
+  static const String paymentsCheckout = '/payments/checkout';
+  static String paymentsVerify(String reference) => '/payments/verify/$reference';
+  static const String usersMe = '/users/me';
+  static const String resendVerification = '/auth/resend-verification';
+  static String featureStartTrial(String key) => '/features/$key/start-trial';
+  static String sync(String key) => '/sync/$key';
 
   // Files
   static const String filesUpload = '/files/upload';

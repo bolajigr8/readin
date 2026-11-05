@@ -1,3 +1,4 @@
+// ignore_for_file: constant_identifier_names
 import 'package:flutter/material.dart';
 
 /// Icon set used by the app, with the same names as RN's Ionicons.
@@ -103,4 +104,14 @@ class Ionicons {
   static const IconData share_outline = Icons.share_outlined;
   static const IconData volume_medium_outline = Icons.volume_down_outlined;
   static const IconData water_outline = Icons.water_drop_outlined;
+  static const IconData checkmark_done_outline = Icons.done_all;
+  static const IconData ellipsis_vertical = Icons.more_vert;
+  static const IconData phone_portrait_outline = Icons.smartphone;
+  static const IconData share_social_outline = Icons.share_outlined;
+  static const IconData star_outline = Icons.star_border;
+  static const IconData time_outline = Icons.schedule;
+  static const IconData calendar_outline = Icons.calendar_today_outlined;
+  static const IconData calendar = Icons.calendar_month;
+  static const IconData create = Icons.edit;
+  static const IconData radio_button_off = Icons.radio_button_unchecked;
 }

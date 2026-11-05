@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:readin_flutter/constants/ionicons.dart';
 
 import '../../../constants/app_colors.dart';
+import '../../../core/errors/app_exception.dart';
 import '../../../core/services/routes.dart';
 import '../../../theme/app_typography.dart';
 import '../../../widgets/app_header.dart';
@@ -105,8 +106,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         child: EmptyState(
           icon: Ionicons.wifi_outline,
           title: 'Could not load books',
-          description:
-              'Check your internet connection. Gutenberg requires internet access.',
+          description: _explain(feed.error!),
           actionLabel: 'Try Again',
           onAction: () =>
               ref.read(discoverFeedProvider(query).notifier).loadFirst(),
@@ -121,10 +121,20 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         ),
       );
     } else {
-      body = _Grid(
-        query: query,
-        feed: feed,
-        inLibrary: inLibrary,
+      body = Column(
+        children: [
+          if (feed.fromCache)
+            _SavedCopyBanner(
+              onRetry: () => ref.read(discoverFeedProvider(query).notifier).loadFirst(),
+            ),
+          Expanded(
+            child: _Grid(
+              query: query,
+              feed: feed,
+              inLibrary: inLibrary,
+            ),
+          ),
+        ],
       );
     }
 
@@ -297,6 +307,53 @@ class _CategoryChip extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Why the list could not load — in plain words (phone offline vs. Gutenberg's
+/// free catalogue being slow are very different problems).
+String _explain(AppException e) {
+  if (e is NetworkException) {
+    return 'No internet connection. Check your network and try again.';
+  }
+  if (e is RequestTimeoutException) {
+    return "${e.message}\n\nThis is not a problem with your phone or the app — it usually passes within a minute. Tap Try Again.";
+  }
+  if (e is ServerException) return '${e.message}\n\nTap Try Again in a moment.';
+  return 'Something went wrong while loading books. Tap Try Again.';
+}
+
+class _SavedCopyBanner extends StatelessWidget {
+  const _SavedCopyBanner({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: AppColors.alpha(AppColors.amber400, 0x18),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.alpha(AppColors.amber400, 0x50)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              "Gutenberg isn't answering right now — showing your last saved list.",
+              style: AppTypography.label(size: 12, color: AppColors.textSecondary, lineHeight: 17),
+            ),
+          ),
+          TextButton(
+            onPressed: onRetry,
+            child: Text('Retry', style: AppTypography.label(size: 12, weight: FontWeight.w600, color: AppColors.primary500)),
+          ),
+        ],
       ),
     );
   }

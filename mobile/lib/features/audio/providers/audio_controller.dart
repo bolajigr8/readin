@@ -97,13 +97,17 @@ class AudioState {
 /// RN showed `totalSentences` (sentence count) next to a **chunk** index; here
 /// both are chunk based so the progress bar is consistent.
 class AudioController extends StateNotifier<AudioState> {
-  AudioController(this._engine) : super(const AudioState());
+  AudioController(this._engine, {this.useNotification = true}) : super(const AudioState());
+
+  /// Foreground notification + lock-screen buttons (Android). Tests turn it off.
+  final bool useNotification;
 
   final TtsEngine _engine;
   Timer? _sleepTimer;
   StreamSubscription<String>? _actionsSub;
 
   void _notify() {
+    if (!useNotification) return;
     // Foreground notification: keeps the voice alive with the screen off and
     // puts Previous / Play-Pause / Next / Stop on the lock screen.
     try {
@@ -186,7 +190,7 @@ class AudioController extends StateNotifier<AudioState> {
   void stop() {
     _engine.stop();
     state = state.copyWith(isPlaying: false, miniVisible: false);
-    ReadAloudNotification.stop(owner: 'audio');
+    if (useNotification) ReadAloudNotification.stop(owner: 'audio');
   }
 
   void seek(int index) {
@@ -215,7 +219,7 @@ class AudioController extends StateNotifier<AudioState> {
       _sleepTimer?.cancel();
       _engine.stop();
       state = state.copyWith(isPlaying: false, miniVisible: false, index: 0);
-      ReadAloudNotification.stop(owner: 'audio');
+      if (useNotification) ReadAloudNotification.stop(owner: 'audio');
       return;
     }
     _engine.speak(

@@ -1,3 +1,4 @@
+import '../../../core/formats.dart';
 import 'package:flutter/material.dart';
 import 'package:readin_flutter/constants/ionicons.dart';
 
@@ -71,6 +72,10 @@ class BookCard extends StatelessWidget {
                   coverUrl: book.coverUrl,
                   height: c.coverHeight,
                   radius: c.radius - 2,
+                  bookId: book.id,
+                  badge: book.kind == ViewerKind.epub || book.kind == ViewerKind.pdf
+                      ? null
+                      : labelOfFormat(book.format),
                 ),
                 if (progress?.isCompleted == true)
                   Positioned(

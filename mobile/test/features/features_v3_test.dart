@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:readin_flutter/core/formats.dart';
 import 'package:readin_flutter/features/annotations/data/annotation_models.dart';
+import 'package:readin_flutter/features/library/data/book_meta_store.dart';
 import 'package:readin_flutter/features/library/data/datasources/library_remote_datasource.dart';
 import 'package:readin_flutter/features/library/data/local_import_service.dart';
 import 'package:readin_flutter/features/library/data/local_library_store.dart';
@@ -143,7 +144,7 @@ void main() {
       expect(effectiveStatus(_book('1'), d), ReadStatus.none);
       expect(effectiveStatus(_book('2', pct: 30), d), ReadStatus.reading);
       expect(effectiveStatus(_book('3', done: true), d), ReadStatus.finished);
-      final d2 = ShelfData(status: {'1': ReadStatus.want, '3': ReadStatus.reading});
+      const d2 = ShelfData(status: {'1': ReadStatus.want, '3': ReadStatus.reading});
       expect(effectiveStatus(_book('1'), d2), ReadStatus.want);
       expect(effectiveStatus(_book('3', done: true), d2), ReadStatus.reading);
     });
@@ -182,10 +183,12 @@ void main() {
 
     test('challenge pace', () {
       final jul1 = DateTime(2026, 7, 2);
+      // Halfway through the year the schedule is floor(12 * 182/365) = 5 books.
       expect(challengePace(goal: 12, finished: 12, now: jul1), contains('complete'));
-      expect(challengePace(goal: 12, finished: 9, now: jul1), contains('ahead'));
-      expect(challengePace(goal: 12, finished: 6, now: jul1), 'Right on track');
-      expect(challengePace(goal: 12, finished: 2, now: jul1), contains('behind'));
+      expect(challengePace(goal: 12, finished: 9, now: jul1), '4 books ahead of schedule');
+      expect(challengePace(goal: 12, finished: 6, now: jul1), '1 book ahead of schedule');
+      expect(challengePace(goal: 12, finished: 5, now: jul1), 'Right on track');
+      expect(challengePace(goal: 12, finished: 2, now: jul1), '3 books behind schedule');
     });
 
     test('badges unlock at their targets and report progress', () {
@@ -254,7 +257,7 @@ void main() {
     test('mergeLibrary puts pending first and never duplicates', () {
       final server = LibraryResponse(
         books: [_book('s1', fp: 'F1'), _book('s2')],
-        meta: LibraryMeta.empty,
+        meta: const LibraryMeta(total: 2, page: 1, limit: 50, totalPages: 1, limitReached: false),
       );
       final pending = [
         _book('local_x', fp: 'F9'),
@@ -290,6 +293,7 @@ void main() {
         store: store,
         repo: LibraryRepository(LibraryRemoteDataSource(api)),
         userId: () => 'u1',
+        meta: BookMetaStore(documentsDir: () async => Directory('${tmp.path}/meta2')..createSync()),
       );
     }
 

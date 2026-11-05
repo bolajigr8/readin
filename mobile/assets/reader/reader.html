@@ -19,6 +19,25 @@
   var CFG = __READIN_CONFIG__;           // replaced by the Dart server (JSON)
   var book = null, rendition = null, tocMap = {}, lastLoc = null;
 
+  // ── tap zones ─────────────────────────────────────────────────────────────
+  // In paged mode epub.js lays the whole chapter out in ONE wide iframe and scrolls
+  // the container sideways, so `clientX` inside the iframe counts from the start of
+  // the chapter, not from the screen edge. Adding the iframe's on-screen offset
+  // (negative once you are past page 1) gives the real position on screen.
+  function tapX(e) {
+    var x = (e && e.clientX) || 0;
+    try {
+      var fe = e && e.view && e.view.frameElement;
+      if (fe && fe.getBoundingClientRect) x += fe.getBoundingClientRect().left;
+    } catch (err) {}
+    return x;
+  }
+  function tapZone(x, width) {
+    if (x < width * 0.25) return 'prev';
+    if (x > width * 0.75) return 'next';
+    return 'menu';
+  }
+
   function post(o) {
     try { ReadIn.postMessage(JSON.stringify(o)); } catch (e) {}
   }
@@ -34,65 +53,104 @@
     'atkinson': "'Atkinson Hyperlegible', Roboto, sans-serif",
     'opendyslexic': "'OpenDyslexic', 'Comic Sans MS', Roboto, sans-serif"
   };
-  // Web fonts load on demand (first use needs internet; the WebView caches them).
-  var FONT_CSS = {
-    literata: 'https://fonts.googleapis.com/css2?family=Literata:ital,wght@0,400;0,700;1,400&display=swap',
-    merriweather: 'https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,400;0,700;1,400&display=swap',
-    lora: 'https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,700;1,400&display=swap',
-    lexend: 'https://fonts.googleapis.com/css2?family=Lexend:wght@400;700&display=swap',
-    atkinson: 'https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap',
-    opendyslexic: 'https://cdn.jsdelivr.net/npm/@fontsource/opendyslexic@5/400.css'
+  // Fonts are BUNDLED with the app (assets/reader/fonts) — they work offline and
+  // every choice really changes the text. file = prefix of the .woff2 files.
+  var FONT_FILES = {
+    merriweather: { family: 'Merriweather', file: 'merriweather', faces: [[300,'normal'],[400,'normal'],[700,'normal'],[900,'normal'],[400,'italic'],[700,'italic']] },
+    literata: { family: 'Literata', file: 'literata', faces: [[300,'normal'],[400,'normal'],[700,'normal'],[900,'normal'],[400,'italic'],[700,'italic']] },
+    lora: { family: 'Lora', file: 'lora', faces: [[400,'normal'],[700,'normal'],[400,'italic'],[700,'italic']] },
+    lexend: { family: 'Lexend', file: 'lexend', faces: [[300,'normal'],[400,'normal'],[700,'normal'],[900,'normal']] },
+    atkinson: { family: 'Atkinson Hyperlegible', file: 'atkinson-hyperlegible', faces: [[400,'normal'],[700,'normal'],[400,'italic'],[700,'italic']] },
+    opendyslexic: { family: 'OpenDyslexic', file: 'opendyslexic', faces: [[400,'normal'],[700,'normal'],[400,'italic'],[700,'italic']] }
   };
-  var currentFontUrl = null;
-  function ensureFont(family) {
-    currentFontUrl = FONT_CSS[family] || null;
-    if (!currentFontUrl || !rendition) return;
-    try { rendition.getContents().forEach(function (c) { c.addStylesheet(currentFontUrl); }); } catch (e) {}
-  }
+  var FONT_FACE_CSS = (function () {
+    var base = new URL('fonts/', document.baseURI).href, css = '';
+    Object.keys(FONT_FILES).forEach(function (k) {
+      var f = FONT_FILES[k];
+      f.faces.forEach(function (x) {
+        css += "@font-face{font-family:'" + f.family + "';font-style:" + x[1] + ";font-weight:" + x[0] +
+          ";font-display:swap;src:url('" + base + f.file + '-latin-' + x[0] + '-' + x[1] + ".woff2') format('woff2');}";
+      });
+    });
+    return css;
+  })();
   var THEMES = {
     dark:  { bg: '#0A0A0A', fg: '#E4E4E7' },
     light: { bg: '#FFFFFF', fg: '#1A1A1A' },
-    sepia: { bg: '#F5E6C8', fg: '#3D2B1F' },
+    sepia: { bg: '#F0DEC6', fg: '#121212' },
     night: { bg: '#000000', fg: '#B4B4B4' }
   };
   var IS_SCROLL = CFG.flow === 'scroll';
 
-  // p = { fontSize, fontFamily, theme, lineHeight, margin, align }
+  // p = { fontSize, fontFamily, theme, lineHeight, margin, align, hyphenate, fontWeight }
   function themeRules(p) {
     var t = THEMES[p.theme] || THEMES.dark;
     var fam = FAMILIES[p.fontFamily] || FAMILIES['sans-serif'];
-    return {
-      'html,body,p,span,div,li,td,th,h1,h2,h3,h4,h5,h6': {
+    var lh = p.lineHeight || 1.5;
+    var w = p.fontWeight || 400;
+    var hy = p.hyphenate !== false && p.align === 'justify' ? 'auto' : 'manual';
+    var rules = {
+      'html,body,p,span,div,li,td,th,h1,h2,h3,h4,h5,h6,blockquote,dd,dt,em,i,a': {
         'color': t.fg + ' !important',
         'background': 'transparent !important',
-        'font-family': fam + ' !important'
+        'font-family': fam + ' !important',
+        'font-weight': w + ' !important'
       },
-      'p,li': { 'text-align': (p.align === 'justify' ? 'justify' : 'left') + ' !important' },
+      // <b>/<strong> stay heavier than the body text
+      'b,strong': { 'font-weight': (w >= 700 ? 900 : 700) + ' !important' },
+      // Books give their own paragraphs a line-height, so it must be set on the text elements too.
+      'p,li,blockquote,dd,dt,div,span,a,td,th': { 'line-height': lh + ' !important' },
+      'p,li': {
+        'text-align': (p.align === 'justify' ? 'justify' : 'left') + ' !important',
+        'hyphens': hy + ' !important',
+        '-webkit-hyphens': hy + ' !important'
+      },
       'body': {
         'background': t.bg + ' !important',
         'font-size': p.fontSize + 'px !important',
-        'line-height': (p.lineHeight || 1.6) + ' !important',
-        'padding': '0 ' + (p.margin == null ? 16 : p.margin) + 'px !important'
+        'line-height': lh + ' !important'
       },
       'a': { 'color': '#FB923C !important' },
       'img': { 'max-width': '100% !important' }
     };
+    // Paged mode: epub.js sets the side padding itself from the page "gap" (see applyTheme).
+    if (IS_SCROLL) rules['body']['padding'] = '0 ' + (p.margin == null ? 16 : p.margin) + 'px !important';
+    return rules;
+  }
+
+  var layoutKey = null, relayoutTimer = null;
+  function gapFor(margin) { return Math.max(0, Math.round((margin == null ? 16 : margin) * 2)); }
+
+  // Re-flows the page after a layout-affecting change, staying at the same place.
+  function scheduleRelayout() {
+    clearTimeout(relayoutTimer);
+    relayoutTimer = setTimeout(function () {
+      if (!rendition) return;
+      var cfi = lastLoc && lastLoc.start && lastLoc.start.cfi;
+      try { rendition.manager.updateLayout(); } catch (e) {}
+      try { rendition.display(cfi || undefined); } catch (e) {}
+    }, 120);
   }
 
   // Single registered theme that is re-registered + re-selected on change.
   // The page / book is NEVER reloaded for a settings change.
   function applyTheme(p) {
     if (!rendition) return;
-    ensureFont(p.fontFamily);
-    var name = 'readin-' + [p.theme, p.fontFamily, p.fontSize, p.lineHeight, p.margin, p.align].join('-');
+    PAGE_ANIM = p.pageAnim !== 'none';
+    var name = 'readin-' + [p.theme, p.fontFamily, p.fontSize, p.lineHeight, p.margin, p.align, p.hyphenate, p.fontWeight, IS_SCROLL ? 's' : 'p'].join('-');
     rendition.themes.register(name, themeRules(p));
     rendition.themes.select(name);
     var t = THEMES[p.theme] || THEMES.dark;
     document.body.style.background = t.bg;
     document.getElementById('viewer').style.background = t.bg;
+    try { if (rendition.manager && rendition.manager.settings) rendition.manager.settings.gap = gapFor(p.margin); } catch (e) {}
+    var key = [p.fontSize, p.fontFamily, p.fontWeight, p.lineHeight, p.margin, p.align, p.hyphenate].join('|');
+    if (layoutKey !== null && key !== layoutKey) scheduleRelayout();
+    layoutKey = key;
   }
 
   function report(loc) {
+    if (animating) return;
     if (!loc || !loc.start) return;
     lastLoc = loc;
     var pct = 0;
@@ -100,6 +158,13 @@
       pct = book.locations.length()
         ? Math.round(book.locations.percentageFromCfi(loc.start.cfi) * 100)
         : Math.round((loc.start.percentage || 0) * 100);
+    } catch (e) {}
+    var page = 0, pages = 0;
+    try {
+      if (book.locations && book.locations.length()) {
+        var li = book.locations.locationFromCfi(loc.start.cfi);
+        if (li >= 0) { page = li + 1; pages = book.locations.length(); }
+      }
     } catch (e) {}
     var base = (loc.start.href || '').split('#')[0];
     post({
@@ -109,6 +174,8 @@
       chapterTitle: tocMap[base] || '',
       href: base,
       percentage: pct,
+      page: page,
+      pages: pages,
       locationsReady: !!(book.locations && book.locations.length && book.locations.length())
     });
   }
@@ -149,9 +216,66 @@
     return rect.left >= c.scrollLeft - 2 && rect.left < c.scrollLeft + c.clientWidth;
   }
 
+
+  // ── page-turn animation ───────────────────────────────────────────────────────
+  // epub.js turns a page by JUMPING the scroll position (nothing visibly moves).
+  // Here the move is animated with an eased slide (like the big reader apps).
+  // Everything that turns a page goes through turn(): while a slide is running a
+  // further tap is remembered (max one) and played right after, so pages never
+  // end up half-way. Long jumps (contents, search, bookmarks) stay instant.
+  var PAGE_ANIM = CFG.pageAnim !== 'none';
+  var REDUCED = false;
+  try { REDUCED = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) {}
+  var animating = false, queuedDir = 0, queuedN = 0, animRaf = 0;
+  // Remember turns requested while a slide is running (up to 5, same direction).
+  function enqueueTurn(dir) {
+    queuedN = queuedDir === dir ? Math.min(5, queuedN + 1) : 1;
+    queuedDir = dir;
+  }
+  function turn(dir) {
+    if (!rendition) return;
+    if (animating) { enqueueTurn(dir); return; }
+    if (dir > 0) rendition.next(); else rendition.prev();
+  }
+  function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+  function installPageAnimation() {
+    var m = rendition && rendition.manager;
+    if (!m || m.__readinAnim) return;
+    m.__readinAnim = true;
+    var origBy = m.scrollBy.bind(m);
+    // epub.js turns a page with scrollBy(±pageWidth). Animate exactly that move.
+    m.scrollBy = function (x, y, silent) {
+      var c = m.container;
+      var ltr = !m.settings || !m.settings.direction || m.settings.direction === 'ltr';
+      if (!PAGE_ANIM || REDUCED || IS_SCROLL || !c || !ltr || y || !x ||
+          (m.settings && m.settings.fullsize) || Math.abs(x) > c.offsetWidth * 1.6) {
+        return origBy(x, y, silent);
+      }
+      // A move that arrives while a slide is running (rapid taps) is remembered and played next.
+      if (animating) { enqueueTurn(x > 0 ? 1 : -1); return; }
+      var from = c.scrollLeft, to = from + x, dur = 260, t0 = 0;
+      animating = true;
+      cancelAnimationFrame(animRaf);
+      var finish = function () {
+        c.scrollLeft = to;
+        animating = false;
+        origBy(0, 0, silent); // epub.js learns about the move exactly ONCE, at the end
+        if (queuedN > 0) { queuedN--; var d = queuedDir; if (queuedN === 0) queuedDir = 0; turn(d); }
+      };
+      var step = function (now) {
+        if (!t0) t0 = now;
+        var p = Math.min(1, (now - t0) / dur);
+        c.scrollLeft = from + x * easeOutCubic(p);
+        if (p < 1) animRaf = requestAnimationFrame(step); else finish();
+      };
+      animRaf = requestAnimationFrame(step);
+    };
+  }
+
   window.readerApi = {
-    next: function () { if (rendition) rendition.next(); },
-    prev: function () { if (rendition) rendition.prev(); },
+    next: function () { turn(1); },
+    prev: function () { turn(-1); },
+    setPageAnim: function (mode) { PAGE_ANIM = mode !== 'none'; },
     display: function (target) {
       if (!rendition) return;
       rendition.display(target).catch(function (e) {
@@ -176,7 +300,7 @@
         }, 20);
       } else {
         var ms = [0, 26000, 15000, 8000][autoLevel] || 15000;
-        autoTimer = setInterval(function () { rendition.next(); }, ms);
+        autoTimer = setInterval(function () { turn(1); }, ms);
       }
     },
 
@@ -333,12 +457,20 @@
         rendition = book.renderTo('viewer', {
           width: '100%', height: '100%', spread: 'none',
           flow: IS_SCROLL ? 'scrolled-doc' : 'paginated',
+          gap: gapFor(CFG.margin),
           allowScriptedContent: false
         });
+        // the page manager is created asynchronously: hook in as soon as it exists
+        rendition.started.then(installPageAnimation).catch(function () {});
         applyTheme(CFG);
         // Non-blocking: the page renders at once, the font swaps in when loaded.
         rendition.hooks.content.register(function (contents) {
-          if (currentFontUrl) { try { contents.addStylesheet(currentFontUrl); } catch (e) {} }
+          try {
+            var root = contents.document.documentElement;
+            if (!root.getAttribute('lang')) root.setAttribute('lang', (book.package && book.package.metadata && book.package.metadata.language) || 'en');
+          } catch (e) {}
+          try { contents.addStylesheetCss(FONT_FACE_CSS, 'readin-fonts'); } catch (e) {}
+          installPageAnimation(); // (no-op once installed)
         });
 
         rendition.display(CFG.initialCfi || undefined)
@@ -367,6 +499,7 @@
         book.ready.then(function () { return book.locations.generate(1200); })
           .then(function () {
             post({ type: 'LOCATIONS_READY' });
+            if (lastLoc) report(lastLoc);
             var l = rendition.currentLocation();
             if (l && l.start) report(l);
           }).catch(function () {});
@@ -393,18 +526,19 @@
           var dx = t.screenX - tx, dy = t.screenY - ty;
           if (IS_SCROLL || Date.now() - tt > 700) return;
           if (Math.abs(dx) > 50 && Math.abs(dy) < 40 && Math.abs(dx) > Math.abs(dy) * 2) {
-            if (dx < 0) rendition.next(); else rendition.prev();
+            if (dx < 0) turn(1); else turn(-1);
           }
         });
 
-        // Tap zones 25 / 50 / 25 (ignored while text is selected)
+        // Tap zones 25 / 50 / 25 (ignored while text is selected):
+        //   left edge = previous page · right edge = next page · middle = show/hide the bars.
         rendition.on('click', function (e) {
-          var w = window.innerWidth, x = e.clientX || 0;
           var sel = e.view && e.view.getSelection && e.view.getSelection().toString();
           if (sel) return;
           if (IS_SCROLL) { post({ type: 'TAP' }); return; }
-          if (x < w * 0.25) rendition.prev();
-          else if (x > w * 0.75) rendition.next();
+          var zone = tapZone(tapX(e), window.innerWidth);
+          if (zone === 'prev') turn(-1);
+          else if (zone === 'next') turn(1);
           else post({ type: 'TAP' });
         });
       })

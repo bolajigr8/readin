@@ -30,6 +30,9 @@ void main() {
 
   insertAfterLine('  flutter_tts:', '  just_audio: ^0.9.40', 'just_audio (focus sounds)');
   insertAfterLine('  uuid:', '  crypto: ^3.0.3', 'crypto (file fingerprints)');
+  insertAfterLine('  crypto:', '  archive: ^4.3.0', 'archive (EPUB covers)');
+  insertAfterLine('  archive:', '  xml: ^7.0.1', 'xml (EPUB details)');
+  insertAfterLine('    - assets/reader/', '    - assets/reader/fonts/', 'assets/reader/fonts/ (bundled reader fonts)');
   insertAfterLine('    - assets/reader/', '    - assets/audio/', 'assets/audio/');
   insertAfterLine('    - assets/icons/', '    - assets/audio/', 'assets/audio/');
 

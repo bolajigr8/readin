@@ -18,7 +18,9 @@ class AppRoutes {
   static const String bookDetail = '/book/:gutenbergId';
   static const String reader = '/reader/:bookId';
   static const String document = '/document/:bookId';
+  static const String about = '/about/:bookId';
   static const String notes = '/notes';
+  static const String habits = '/habits';
   static const String badges = '/badges';
   static const String importBook = '/import';
   static const String upgrade = '/upgrade';
@@ -30,6 +32,7 @@ class AppRoutes {
   static String bookDetailPath(String gutenbergId) => '/book/$gutenbergId';
   static String readerPath(String bookId) => '/reader/$bookId';
   static String documentPath(String bookId) => '/document/$bookId';
+  static String aboutPath(String bookId) => '/about/$bookId';
 
   /// Routes reachable without a session.
   static const Set<String> publicRoutes = {onboarding, signIn, signUp, forgot};

@@ -166,7 +166,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         idToken: account.idToken,
       );
       if (!mounted) return false;
-      return res.when(
+      return await res.when(
         success: (user) {
           state = AuthState(
             status: AuthStatus.authenticated,
@@ -207,7 +207,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// RN `logout`: fire-and-forget API call, then clear everything.
   Future<void> logout() async {
     await _repo.logout();
-    await _ref.read(googleSignInServiceProvider).signOut();
+    if (kGoogleSignInEnabled) await _ref.read(googleSignInServiceProvider).signOut();
     if (!mounted) return;
     state = const AuthState(status: AuthStatus.loggedOut, isHydrated: true);
   }

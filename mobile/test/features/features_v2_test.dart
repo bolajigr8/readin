@@ -26,6 +26,8 @@ class _Tts implements TtsEngine {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized(); // the goal toast touches the widgets binding
+
   group('time left formatting', () {
     test('formatMinutes', () {
       expect(formatMinutes(0), '<1 min');
@@ -39,17 +41,20 @@ void main() {
     const base = ReaderPrefs(fontSize: 17, fontFamily: 'serif', theme: 'night');
 
     test('defaults + page json (no brightness / volume / flow)', () {
-      expect(base.lineHeight, 1.6);
-      expect(base.margin, 16);
+      expect(base.lineHeight, 1.5);
+      expect(base.margin, 32);
       expect(base.flow, 'paged');
       expect(base.isScroll, isFalse);
       expect(base.toPageJson(), {
         'fontSize': 17,
         'fontFamily': 'serif',
         'theme': 'night',
-        'lineHeight': 1.6,
-        'margin': 16,
-        'align': 'left',
+        'lineHeight': 1.5,
+        'margin': 32,
+        'align': 'justify',
+        'hyphenate': true,
+        'fontWeight': 700,
+        'pageAnim': 'slide',
       });
     });
 
@@ -60,8 +65,8 @@ void main() {
         base.copyWith(fontFamily: 'sans-serif'),
         base.copyWith(theme: 'light'),
         base.copyWith(lineHeight: 1.8),
-        base.copyWith(margin: 32),
-        base.copyWith(align: 'justify'),
+        base.copyWith(margin: 20),
+        base.copyWith(align: 'left'),
         base.copyWith(flow: 'scroll'),
         base.copyWith(brightness: 0.5),
         base.copyWith(volumeKeys: false),
@@ -238,7 +243,7 @@ void main() {
   });
 
   test('audio sleep timer state', () {
-    final c = AudioController(_Tts());
+    final c = AudioController(_Tts(), useNotification: false);
     expect(c.state.sleepMinutes, isNull);
     c.setSleepTimer(15);
     expect(c.state.sleepMinutes, 15);

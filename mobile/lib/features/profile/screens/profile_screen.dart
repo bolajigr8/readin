@@ -1,3 +1,6 @@
+import 'package:intl/intl.dart';
+import '../../billing/billing_providers.dart';
+import '../../../widgets/app_toast.dart';
 import '../../shelves/widgets/shelf_widgets.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -196,6 +199,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         SettingsCard(
                           children: [
                             SettingsRow(
+                              icon: Ionicons.calendar_outline,
+                              iconColor: AppColors.success500,
+                              label: 'Habits',
+                              sublabel: 'Daily pages goal, calendar, reminders',
+                              onTap: () => context.push(AppRoutes.habits),
+                            ),
+                            SettingsRow(
                               icon: Ionicons.create_outline,
                               iconColor: AppColors.primary500,
                               label: 'My Notes & Highlights',
@@ -217,7 +227,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Subscription
+                  // Subscription — only while payments are switched on in the admin panel
+                  // (or the user already has Premium).
+                  if (ref.watch(billingVisibleProvider) || isPremium) ...[
                   _Section(
                     title: 'SUBSCRIPTION',
                     child: SettingsCard(
@@ -227,7 +239,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             icon: Ionicons.star,
                             iconColor: AppColors.amber400,
                             label: 'Premium Active',
-                            sublabel: 'Unlimited books, annotations, and more',
+                            sublabel: user?.premiumUntil == null
+                                ? 'Unlimited books and every Premium feature'
+                                : 'Active until ${DateFormat.yMMMMd().format(user!.premiumUntil!.toLocal())}',
                             onTap: () => context.push(AppRoutes.upgrade),
                             isLast: true,
                           )
@@ -254,7 +268,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                     ),
                                     children: [
                                       TextSpan(
-                                        text: '$totalBooks / 10 books',
+                                        text: '$totalBooks / ${ref.watch(publicConfigProvider).billing.freeLibraryLimit} books',
                                         style: AppTypography.label(
                                           size: 13,
                                           weight: FontWeight.w600,
@@ -273,7 +287,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                     color: AppColors.borderDefault,
                                     alignment: Alignment.centerLeft,
                                     child: FractionallySizedBox(
-                                      widthFactor: (totalBooks / 10).clamp(0.0, 1.0),
+                                      widthFactor: (totalBooks / ref.watch(publicConfigProvider).billing.freeLibraryLimit).clamp(0.0, 1.0).toDouble(),
                                       heightFactor: 1,
                                       child: DecoratedBox(
                                         decoration: BoxDecoration(
@@ -292,6 +306,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
+                  ],
 
                   // Reader preferences
                   _Section(
@@ -343,11 +358,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         SettingsRow(
                           icon: Ionicons.notifications_outline,
                           iconColor: AppColors.primary400,
-                          label: 'Push Notifications',
-                          sublabel: 'Updates about your library',
+                          label: 'Reading Reminders',
+                          sublabel: 'Coming soon with the Habit tracker',
                           rightContent: AppSwitch(
-                            value: settings.notificationsEnabled,
-                            onChanged: settingsCtl.setNotifications,
+                            value: false,
+                            onChanged: (_) => AppToast.info('Reading reminders arrive with the Habit tracker.'),
+                          ),
+                        ),
+                        SettingsRow(
+                          icon: Ionicons.book_outline,
+                          iconColor: AppColors.primary500,
+                          label: 'Open Last Book on Launch',
+                          sublabel: 'Continue exactly where you stopped',
+                          rightContent: AppSwitch(
+                            value: settings.openLastBook,
+                            onChanged: settingsCtl.setOpenLastBook,
                           ),
                         ),
                         SettingsRow(

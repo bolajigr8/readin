@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:readin_flutter/constants/ionicons.dart';
 
 import '../../../constants/app_colors.dart';
@@ -10,10 +11,12 @@ import '../../../widgets/app_toast.dart';
 import '../../../widgets/confirm_dialog.dart';
 import '../../../widgets/pressable_opacity.dart';
 import '../../auth/providers/auth_providers.dart';
-import '../data/premium_service.dart';
-import '../providers/premium_providers.dart';
+import '../../billing/billing_models.dart';
+import '../../billing/billing_providers.dart';
+import '../../billing/checkout_screen.dart';
+import '../../features/features_provider.dart';
 
-/// UI_SPEC §4.16 — Upgrade (modal).
+/// Premium: pick a plan (prices in naira, set by the admin) and pay with Paystack.
 class UpgradeScreen extends ConsumerStatefulWidget {
   const UpgradeScreen({super.key});
 
@@ -22,9 +25,16 @@ class UpgradeScreen extends ConsumerStatefulWidget {
 }
 
 class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
-  String _selected = 'premium_annual';
-  bool _purchasing = false;
-  bool _restoring = false;
+  String? _selectedId;
+  bool _busy = false;
+  String _busyLabel = '';
+
+  @override
+  void initState() {
+    super.initState();
+    // fresh plans / prices every time the screen opens
+    WidgetsBinding.instance.addPostFrameCallback((_) => ref.read(publicConfigProvider.notifier).refresh());
+  }
 
   void _close() {
     if (context.canPop()) {
@@ -34,188 +44,285 @@ class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
     }
   }
 
-  Future<void> _activated() async {
-    // TODO(server): there is no GET /auth/me; the server flips `plan` through
-    // the RevenueCat webhook. Until a refresh endpoint exists, reflect the
-    // entitlement locally so the UI unlocks immediately.
-    final user = ref.read(currentUserProvider);
-    if (user != null) await ref.read(authProvider.notifier).setUser(user.copyWith(plan: 'premium'));
-    if (!mounted) return;
-    AppToast.success('Premium activated!');
-    _close();
+  PublicPlan? _plan(List<PublicPlan> plans) {
+    if (plans.isEmpty) return null;
+    return plans.firstWhere((p) => p.id == _selectedId, orElse: () => plans.first);
   }
 
-  Future<void> _comingSoon() => showAlertDialog(
-        context,
-        title: 'Premium is coming soon ✨',
-        message:
-            'Unlimited books, cloud backup, advanced stats and more are on the way. Everything you use today stays free.',
-      );
-
-  Future<void> _purchase() async {
-    if (kPremiumComingSoon) {
-      await _comingSoon();
+  Future<void> _pay(PublicPlan plan) async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _busyLabel = 'Starting payment…';
+    });
+    final res = await ref.read(billingApiProvider).checkout(plan.id);
+    if (!mounted) return;
+    final session = res.dataOrNull;
+    if (session == null) {
+      setState(() => _busy = false);
+      AppToast.error(res.exceptionOrNull?.message ?? 'Could not start the payment.');
       return;
     }
-    if (_purchasing) return;
-    setState(() => _purchasing = true);
-    PremiumResult result;
-    try {
-      result = await ref.read(premiumServiceProvider).purchase(_selected);
-    } catch (_) {
-      result = PremiumResult.failed;
-    }
-    if (!mounted) return;
-    setState(() => _purchasing = false);
+    setState(() => _busy = false);
 
-    switch (result) {
-      case PremiumResult.success:
-        await _activated();
-      case PremiumResult.cancelled:
-        break; // not an error
-      case PremiumResult.unavailable:
-        AppToast.info('Purchase flow available in production build.');
-      case PremiumResult.nothingToRestore:
-      case PremiumResult.failed:
-        AppToast.error('Purchase failed. Please try again.');
-    }
+    final reference = await Navigator.of(context).push<String>(
+      MaterialPageRoute<String>(
+        fullscreenDialog: true,
+        builder: (_) => PaystackCheckoutScreen(
+          url: session.authorizationUrl,
+          reference: session.reference,
+          title: 'Pay ${session.amountText}',
+        ),
+      ),
+    );
+    if (!mounted) return;
+    await _confirm(reference ?? session.reference);
   }
 
-  Future<void> _restore() async {
-    if (kPremiumComingSoon) {
-      await _comingSoon();
-      return;
-    }
-    if (_restoring) return;
-    setState(() => _restoring = true);
-    PremiumResult result;
-    try {
-      result = await ref.read(premiumServiceProvider).restore();
-    } catch (_) {
-      result = PremiumResult.failed;
+  /// Asks the server whether the payment went through (Paystack can need a few seconds).
+  Future<void> _confirm(String reference) async {
+    setState(() {
+      _busy = true;
+      _busyLabel = 'Confirming your payment…';
+    });
+    PaymentVerification? result;
+    for (var attempt = 0; attempt < 5; attempt++) {
+      final r = await ref.read(billingApiProvider).verify(reference);
+      result = r.dataOrNull;
+      if (result != null && result.status != PaymentStatus.pending) break;
+      if (!mounted) return;
+      await Future<void>.delayed(const Duration(seconds: 2));
     }
     if (!mounted) return;
-    setState(() => _restoring = false);
+    setState(() => _busy = false);
 
-    switch (result) {
-      case PremiumResult.success:
-        AppToast.success('Premium restored!');
-        await _activated();
-      case PremiumResult.nothingToRestore:
-        AppToast.info('No active subscription found.');
-      case PremiumResult.unavailable:
-        AppToast.info('Restore available in production build.');
-      case PremiumResult.cancelled:
-        break;
-      case PremiumResult.failed:
-        AppToast.error('Could not restore purchases.');
+    switch (result?.status) {
+      case PaymentStatus.success:
+        await ref.read(refreshUserProvider)();
+        await ref.read(featuresProvider.notifier).refresh();
+        if (!mounted) return;
+        await showAlertDialog(
+          context,
+          title: 'Premium is active! 🎉',
+          message: result?.premiumUntil == null
+              ? 'Thank you! Your Premium features are unlocked.'
+              : 'Thank you! Premium is active until ${DateFormat.yMMMMd().format(result!.premiumUntil!.toLocal())}. A receipt was sent to your e-mail.',
+        );
+        if (mounted) _close();
+      case PaymentStatus.failed:
+        AppToast.error('The payment was not completed. You have not been charged.');
+      case PaymentStatus.pending:
+      case null:
+        if (!mounted) return;
+        await showAlertDialog(
+          context,
+          title: 'Still processing',
+          message:
+              'We have not received the confirmation from your bank yet. If you were charged, Premium will switch on by itself within a few minutes — you do not need to pay again.',
+        );
+        await ref.read(refreshUserProvider)();
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final cfg = ref.watch(publicConfigProvider);
+    final user = ref.watch(currentUserProvider);
+    final billing = cfg.billing;
+    final plan = _plan(billing.plans);
+    final isPremium = user?.plan == 'premium';
+
     return Scaffold(
       body: SafeArea(
-        child: Stack(
+        child: Column(
           children: [
-            SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _hero(),
-                  const SizedBox(height: 28),
-                  _featuresCard(),
-                  const SizedBox(height: 28),
-                  _packages(),
-                  const SizedBox(height: 28),
-                  _subscribeButton(),
-                  const SizedBox(height: 28 - 12),
-                  _restoreButton(),
-                  const SizedBox(height: 28),
-                  Text(
-                    'Subscription auto-renews. Cancel any time in your App Store or Google Play account settings. By subscribing you agree to our Terms of Service and Privacy Policy.',
-                    textAlign: TextAlign.center,
-                    style: AppTypography.label(
-                      size: 11,
-                      color: AppColors.textMuted,
-                      lineHeight: 17,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // RN: absolute top 54 / right 20 (from the screen edge).
-            Positioned(
-              top: (54 - MediaQuery.viewPaddingOf(context).top).clamp(0.0, 200.0).toDouble(),
-              right: 20,
+            Align(
+              alignment: Alignment.centerRight,
               child: PressableOpacity(
                 pressedOpacity: 0.7,
                 semanticLabel: 'Close',
                 onTap: _close,
-                child: Container(
-                  width: 34,
-                  height: 34,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Ionicons.close, size: 22, color: AppColors.textSecondary),
-                ),
+                child: const SizedBox(width: 52, height: 52, child: Icon(Ionicons.close, color: AppColors.textPrimary)),
               ),
+            ),
+            Expanded(
+              child: !billing.enabled && !isPremium
+                  ? _Unavailable(onClose: _close)
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Center(child: Text('✨', style: TextStyle(fontSize: 54))),
+                          const SizedBox(height: 10),
+                          Text('ReadIn Premium', textAlign: TextAlign.center, style: AppTypography.title22),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Read without limits and unlock every feature.',
+                            textAlign: TextAlign.center,
+                            style: AppTypography.label(size: 14, color: AppColors.textSecondary),
+                          ),
+                          if (isPremium) ...[
+                            const SizedBox(height: 18),
+                            _ActiveBanner(until: user?.premiumUntil),
+                          ],
+                          const SizedBox(height: 22),
+                          _Benefits(freeLimit: billing.freeLibraryLimit),
+                          const SizedBox(height: 24),
+                          if (billing.enabled) ...[
+                            Text(
+                              isPremium ? 'ADD MORE TIME' : 'CHOOSE A PLAN',
+                              style: AppTypography.label(size: 11, weight: FontWeight.w600, letterSpacing: 0.8, color: AppColors.textMuted),
+                            ),
+                            const SizedBox(height: 10),
+                            if (billing.plans.isEmpty)
+                              Text('No plans are available right now.', style: AppTypography.label(size: 14, color: AppColors.textSecondary))
+                            else
+                              for (final p in billing.plans)
+                                _PlanCard(
+                                  plan: p,
+                                  selected: (plan?.id ?? '') == p.id,
+                                  onTap: () => setState(() => _selectedId = p.id),
+                                ),
+                            const SizedBox(height: 16),
+                            PressableOpacity(
+                              pressedOpacity: 0.85,
+                              onTap: (_busy || plan == null) ? null : () => _pay(plan),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: (_busy || plan == null) ? AppColors.alpha(AppColors.primary500, 0x70) : AppColors.primary500,
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: _busy
+                                    ? Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.white),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Text(_busyLabel, style: AppTypography.label(size: 15, weight: FontWeight.w600, color: AppColors.white)),
+                                        ],
+                                      )
+                                    : Text(
+                                        plan == null ? 'Pay with Paystack' : 'Pay ${plan.priceText} with Paystack',
+                                        style: AppTypography.label(size: 16, weight: FontWeight.w700, color: AppColors.white),
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Ionicons.lock_closed_outline, size: 14, color: AppColors.success500),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    'Secure payment by Paystack — card, bank transfer or USSD',
+                                    textAlign: TextAlign.center,
+                                    style: AppTypography.label(size: 12, color: AppColors.textMuted),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'One payment per period — it does not renew by itself, so you are never charged again unless you choose to pay.',
+                              textAlign: TextAlign.center,
+                              style: AppTypography.label(size: 11, color: AppColors.textMuted, lineHeight: 16),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
             ),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _hero() => Padding(
-        padding: const EdgeInsets.only(top: 40),
-        child: Column(
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.alpha(AppColors.amber400, 0x20),
-                border: Border.all(
-                  color: AppColors.alpha(AppColors.amber400, 0x40),
-                  width: 2,
-                ),
+class _Unavailable extends StatelessWidget {
+  const _Unavailable({required this.onClose});
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('💳', style: TextStyle(fontSize: 48)),
+              const SizedBox(height: 12),
+              Text('Payments are not available', style: AppTypography.title20, textAlign: TextAlign.center),
+              const SizedBox(height: 8),
+              Text(
+                'There is nothing to buy right now. Everything you use today stays available.',
+                textAlign: TextAlign.center,
+                style: AppTypography.label(size: 14, color: AppColors.textSecondary, lineHeight: 21),
               ),
-              child: const Icon(Ionicons.star, size: 36, color: AppColors.amber400),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'ReadIn Premium',
-              style: AppTypography.label(size: 28, weight: FontWeight.w700),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Unlock the full reading experience with unlimited books, highlights, and audio.',
-              textAlign: TextAlign.center,
-              style: AppTypography.label(
-                size: 15,
-                color: AppColors.textSecondary,
-                lineHeight: 22,
+              const SizedBox(height: 18),
+              TextButton(onPressed: onClose, child: const Text('Go back')),
+            ],
+          ),
+        ),
+      );
+}
+
+class _ActiveBanner extends StatelessWidget {
+  const _ActiveBanner({required this.until});
+  final DateTime? until;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.alpha(AppColors.success500, 0x18),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.alpha(AppColors.success500, 0x60)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Ionicons.checkmark_circle, color: AppColors.success500),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                until == null
+                    ? 'Premium is active on your account.'
+                    : 'Premium is active until ${DateFormat.yMMMMd().format(until!.toLocal())}.',
+                style: AppTypography.label(size: 14, weight: FontWeight.w600),
               ),
             ),
           ],
         ),
       );
+}
 
-  Widget _featuresCard() {
-    final headStyle = AppTypography.label(
-      size: 13,
-      weight: FontWeight.w600,
-      color: AppColors.textSecondary,
-    );
+class _Benefits extends StatelessWidget {
+  const _Benefits({required this.freeLimit});
+  final int freeLimit;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget row(String t) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Ionicons.checkmark_circle, size: 20, color: AppColors.primary500),
+              const SizedBox(width: 12),
+              Expanded(child: Text(t, style: AppTypography.label(size: 14, lineHeight: 20))),
+            ],
+          ),
+        );
     return Container(
-      clipBehavior: Clip.antiAlias,
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
@@ -223,244 +330,79 @@ class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
       ),
       child: Column(
         children: [
-          Container(
-            color: AppColors.elevated,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            child: Row(
-              children: [
-                const Expanded(child: SizedBox.shrink()),
-                SizedBox(
-                  width: 80,
-                  child: Text('Free', textAlign: TextAlign.center, style: headStyle),
-                ),
-                SizedBox(
-                  width: 80,
-                  child: Text(
-                    'Premium',
-                    textAlign: TextAlign.center,
-                    style: headStyle.copyWith(color: AppColors.amber400),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(height: 1, color: AppColors.borderDefault),
-          for (var i = 0; i < kPremiumFeatures.length; i++)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                border: i == kPremiumFeatures.length - 1
-                    ? null
-                    : Border(
-                        bottom: BorderSide(
-                          color: AppColors.alpha(AppColors.borderDefault, 0x60),
-                        ),
-                      ),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(kPremiumFeatures[i].label, style: AppTypography.body14),
-                  ),
-                  SizedBox(
-                    width: 80,
-                    child: Text(
-                      kPremiumFeatures[i].free,
-                      textAlign: TextAlign.center,
-                      style: AppTypography.label(size: 12, color: AppColors.textMuted),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 80,
-                    child: Text(
-                      kPremiumFeatures[i].premium,
-                      textAlign: TextAlign.center,
-                      style: AppTypography.label(size: 12, color: AppColors.success400),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          row('Unlimited books (Free plan: up to $freeLimit)'),
+          row('Reading Habit Tracker with reminders and streaks'),
+          row('Every new Premium feature we add'),
+          row('Supports the ReadIn app'),
         ],
-      ),
-    );
-  }
-
-  Widget _packages() {
-    return Column(
-      children: [
-        for (var i = 0; i < kPremiumPackages.length; i++) ...[
-          if (i > 0) const SizedBox(height: 12),
-          _PackageCard(
-            package: kPremiumPackages[i],
-            selected: _selected == kPremiumPackages[i].id,
-            onTap: () => setState(() => _selected = kPremiumPackages[i].id),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _subscribeButton() {
-    return PressableOpacity(
-      pressedOpacity: 0.85,
-      onTap: _purchasing ? null : _purchase,
-      child: Opacity(
-        opacity: _purchasing ? 0.7 : 1,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            color: AppColors.amber400,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Ionicons.star, size: 18, color: AppColors.black),
-              const SizedBox(width: 8),
-              Text(
-                _purchasing ? 'Processing...' : 'Start Premium',
-                style: AppTypography.label(
-                  size: 17,
-                  weight: FontWeight.w700,
-                  color: AppColors.black,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _restoreButton() {
-    return PressableOpacity(
-      pressedOpacity: 0.7,
-      onTap: _restoring ? null : _restore,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Center(
-          child: Text(
-            _restoring ? 'Restoring...' : 'Restore Purchases',
-            style: AppTypography.label(
-              size: 14,
-              color: AppColors.textMuted,
-              decoration: TextDecoration.underline,
-            ),
-          ),
-        ),
       ),
     );
   }
 }
 
-class _PackageCard extends StatelessWidget {
-  const _PackageCard({
-    required this.package,
-    required this.selected,
-    required this.onTap,
-  });
+class _PlanCard extends StatelessWidget {
+  const _PlanCard({required this.plan, required this.selected, required this.onTap});
 
-  final PremiumPackage package;
+  final PublicPlan plan;
   final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return PressableOpacity(
-      pressedOpacity: 0.8,
-      onTap: onTap,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: selected
-                  ? AppColors.alpha(AppColors.amber400, 0x08)
-                  : AppColors.surface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: selected ? AppColors.amber400 : AppColors.borderDefault,
-                width: 1.5,
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 20,
-                        height: 20,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: selected ? AppColors.amber400 : AppColors.borderLight,
-                            width: 2,
-                          ),
-                        ),
-                        child: selected
-                            ? Container(
-                                width: 10,
-                                height: 10,
-                                decoration: const BoxDecoration(
-                                  color: AppColors.amber400,
-                                  shape: BoxShape.circle,
-                                ),
-                              )
-                            : null,
-                      ),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            package.title,
-                            style: AppTypography.label(size: 15, weight: FontWeight.w600),
-                          ),
-                          Text(
-                            package.period,
-                            style: AppTypography.label(size: 12, color: AppColors.textMuted),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: PressableOpacity(
+        pressedOpacity: 0.85,
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.alpha(AppColors.primary500, 0x14) : AppColors.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: selected ? AppColors.primary500 : AppColors.borderDefault, width: selected ? 2 : 1),
+          ),
+          child: Row(
+            children: [
+              Icon(selected ? Ionicons.checkmark_circle : Ionicons.radio_button_off, color: selected ? AppColors.primary500 : AppColors.textMuted),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(child: Text(plan.name, style: AppTypography.label(size: 16, weight: FontWeight.w700))),
+                        if (plan.badge.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(color: AppColors.amber400, borderRadius: BorderRadius.circular(8)),
+                            child: Text(
+                              plan.badge,
+                              style: AppTypography.label(size: 10, weight: FontWeight.w700, color: AppColors.black),
+                            ),
                           ),
                         ],
-                      ),
-                    ],
-                  ),
-                ),
-                Text(
-                  package.price,
-                  style: AppTypography.label(
-                    size: 20,
-                    weight: FontWeight.w700,
-                    color: selected ? AppColors.amber400 : AppColors.textPrimary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (package.savings != null)
-            Positioned(
-              top: -10,
-              right: 16,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                decoration: BoxDecoration(
-                  color: AppColors.amber400,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  package.savings!,
-                  style: AppTypography.label(
-                    size: 11,
-                    weight: FontWeight.w600,
-                    color: AppColors.black,
-                  ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      plan.description.isEmpty ? durationText(plan.durationDays) : plan.description,
+                      style: AppTypography.label(size: 12, color: AppColors.textMuted),
+                    ),
+                  ],
                 ),
               ),
-            ),
-        ],
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(plan.priceText, style: AppTypography.label(size: 18, weight: FontWeight.w800, color: AppColors.primary500)),
+                  Text(durationText(plan.durationDays), style: AppTypography.label(size: 11, color: AppColors.textMuted)),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

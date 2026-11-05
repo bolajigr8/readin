@@ -24,6 +24,34 @@ class AppTypography {
     FontStyle? fontStyle,
     TextDecoration? decoration,
   }) {
+    // SPEED: `GoogleFonts.inter(...)` does font lookups on every call and the
+    // app calls this thousands of times per screen. TextStyles are immutable,
+    // so identical requests share one instance.
+    final key = Object.hash(
+      size, weight, color.toARGB32(), lineHeight, letterSpacing, fontStyle, decoration,
+    );
+    return _cache[key] ??= _make(
+      size: size,
+      weight: weight,
+      color: color,
+      lineHeight: lineHeight,
+      letterSpacing: letterSpacing,
+      fontStyle: fontStyle,
+      decoration: decoration,
+    );
+  }
+
+  static final Map<int, TextStyle> _cache = <int, TextStyle>{};
+
+  static TextStyle _make({
+    required double size,
+    required FontWeight weight,
+    required Color color,
+    double? lineHeight,
+    double? letterSpacing,
+    FontStyle? fontStyle,
+    TextDecoration? decoration,
+  }) {
     // NOTE: weight must be passed to GoogleFonts.inter() itself. Using
     // `GoogleFonts.inter().copyWith(fontWeight: ...)` keeps the Regular file
     // and fakes the weight (blurry faux-bold).

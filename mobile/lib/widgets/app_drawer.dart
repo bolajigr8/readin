@@ -1,3 +1,4 @@
+import '../features/billing/billing_providers.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -24,6 +25,8 @@ const List<_NavItem> _navItems = [
   _NavItem('My Library', Ionicons.library_outline, Ionicons.library),
   _NavItem('Discover', Ionicons.compass_outline, Ionicons.compass),
   _NavItem('Profile', Ionicons.person_outline, Ionicons.person),
+  _NavItem('Habits', Ionicons.calendar_outline, Ionicons.calendar),
+  _NavItem('Notes & Highlights', Ionicons.create_outline, Ionicons.create),
 ];
 
 /// RN `AppDrawer` (UI_SPEC §4.14). Place it in a `Stack` above the tab shell
@@ -354,7 +357,7 @@ class _DrawerPanel extends ConsumerWidget {
                         active: i == activeIndex,
                         onTap: () => onNavigate(i),
                       ),
-                    if (user?.plan == 'free') ...[
+                    if (user?.plan == 'free' && ref.watch(billingVisibleProvider)) ...[
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 12),
                         child: _Sep(),

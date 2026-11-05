@@ -26,6 +26,10 @@ enum StorageKey {
   readerBrightness('@readin/reader_brightness'),
   volumeKeysNav('@readin/volume_keys_nav'),
   readerWarmth('@readin/reader_warmth'),
+  readerHyphenate('@readin/reader_hyphenate'),
+  readerPageAnim('@readin/reader_page_anim'),
+  openLastBook('@readin/open_last_book'),
+  readerFontWeight('@readin/reader_font_weight'),
   readerAutoNight('@readin/reader_auto_night'),
   dailyGoalMinutes('@readin/daily_goal_minutes');
 
@@ -79,7 +83,7 @@ class StorageService {
   }
 
   double get readerFontSize =>
-      _prefs.getDouble(StorageKey.readerFontSize.key) ?? 17;
+      _prefs.getDouble(StorageKey.readerFontSize.key) ?? 15;
   Future<void> setReaderFontSize(double v) =>
       _prefs.setDouble(
         StorageKey.readerFontSize.key,
@@ -87,12 +91,12 @@ class StorageService {
       );
 
   String get readerFontFamily =>
-      _prefs.getString(StorageKey.readerFontFamily.key) ?? 'sans-serif';
+      _prefs.getString(StorageKey.readerFontFamily.key) ?? 'merriweather';
   Future<void> setReaderFontFamily(String v) =>
       _prefs.setString(StorageKey.readerFontFamily.key, v);
 
   String get readerTheme =>
-      _prefs.getString(StorageKey.readerTheme.key) ?? 'dark';
+      _prefs.getString(StorageKey.readerTheme.key) ?? 'sepia';
   Future<void> setReaderTheme(String v) =>
       _prefs.setString(StorageKey.readerTheme.key, v);
 
@@ -102,17 +106,17 @@ class StorageService {
       _prefs.setBool(StorageKey.notificationsEnabled.key, v);
 
   double get readerLineHeight =>
-      _prefs.getDouble(StorageKey.readerLineHeight.key) ?? 1.6;
+      _prefs.getDouble(StorageKey.readerLineHeight.key) ?? 1.5;
   Future<void> setReaderLineHeight(double v) =>
       _prefs.setDouble(StorageKey.readerLineHeight.key, v);
 
   /// Horizontal page margin in px.
-  double get readerMargin => _prefs.getDouble(StorageKey.readerMargin.key) ?? 16;
+  double get readerMargin => _prefs.getDouble(StorageKey.readerMargin.key) ?? 32;
   Future<void> setReaderMargin(double v) =>
       _prefs.setDouble(StorageKey.readerMargin.key, v);
 
   /// `'left'` | `'justify'`.
-  String get readerAlign => _prefs.getString(StorageKey.readerAlign.key) ?? 'left';
+  String get readerAlign => _prefs.getString(StorageKey.readerAlign.key) ?? 'justify';
   Future<void> setReaderAlign(String v) =>
       _prefs.setString(StorageKey.readerAlign.key, v);
 
@@ -134,6 +138,21 @@ class StorageService {
   /// Switch to the Night theme automatically between 20:00 and 06:00.
   bool get readerAutoNight => _prefs.getBool(StorageKey.readerAutoNight.key) ?? false;
   Future<void> setReaderAutoNight(bool v) => _prefs.setBool(StorageKey.readerAutoNight.key, v);
+
+  /// Open the book you were reading when the app starts.
+  bool get openLastBook => _prefs.getBool(StorageKey.openLastBook.key) ?? true;
+  Future<void> setOpenLastBook(bool v) => _prefs.setBool(StorageKey.openLastBook.key, v);
+
+  /// 'slide' or 'none'.
+  String get readerPageAnim => _prefs.getString(StorageKey.readerPageAnim.key) ?? 'slide';
+  Future<void> setReaderPageAnim(String v) => _prefs.setString(StorageKey.readerPageAnim.key, v);
+
+  bool get readerHyphenate => _prefs.getBool(StorageKey.readerHyphenate.key) ?? true;
+  Future<void> setReaderHyphenate(bool v) => _prefs.setBool(StorageKey.readerHyphenate.key, v);
+
+  /// 300 light · 400 normal · 700 bold.
+  int get readerFontWeight => _prefs.getInt(StorageKey.readerFontWeight.key) ?? 700;
+  Future<void> setReaderFontWeight(int v) => _prefs.setInt(StorageKey.readerFontWeight.key, v);
 
   bool get volumeKeysNav => _prefs.getBool(StorageKey.volumeKeysNav.key) ?? true;
   Future<void> setVolumeKeysNav(bool v) =>
@@ -158,4 +177,26 @@ class StorageService {
       _prefs.getBool(StorageKey.autoDownloadEpub.key) ?? true;
   Future<void> setAutoDownloadEpub(bool v) =>
       _prefs.setBool(StorageKey.autoDownloadEpub.key, v);
+}
+
+
+/// One-time reset of the reader look to the new defaults (sepia page,
+/// Merriweather, justified + hyphenated), copied from a well-loved reader.
+/// Runs once per install; later changes by the user are kept.
+Future<void> migrateReaderDefaults(SharedPreferences prefs) async {
+  const version = '@readin/reader_defaults_v';
+  if (prefs.getInt(version) == 4) return;
+  for (final k in [
+    StorageKey.readerFontSize,
+    StorageKey.readerFontFamily,
+    StorageKey.readerTheme,
+    StorageKey.readerLineHeight,
+    StorageKey.readerMargin,
+    StorageKey.readerAlign,
+    StorageKey.readerFontWeight,
+    StorageKey.readerHyphenate,
+  ]) {
+    await prefs.remove(k.key);
+  }
+  await prefs.setInt(version, 4);
 }

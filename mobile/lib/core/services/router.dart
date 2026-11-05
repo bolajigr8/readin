@@ -13,6 +13,8 @@ import '../../features/dev/design_gallery_screen.dart';
 import '../../features/premium/screens/upgrade_screen.dart';
 import '../../features/discover/screens/book_detail_screen.dart';
 import '../../features/documents/document_screen.dart';
+import '../../features/library/screens/book_about_screen.dart';
+import '../../features/habits/habits_entry.dart';
 import '../../features/notes/notes_screen.dart';
 import '../../features/shelves/badges_screen.dart';
 import '../../features/discover/screens/discover_screen.dart';
@@ -210,10 +212,21 @@ final routerProvider = Provider<GoRouter>((ref) {
                 bookId: id,
                 book: extra is Book ? extra : null,
                 local: extra is LocalReadRequest ? extra : null,
+                listen: s.uri.queryParameters['listen'] == '1',
               ),
             ),
           );
         },
+      ),
+      GoRoute(
+        path: AppRoutes.about,
+        pageBuilder: (c, s) => fadePage(
+          s,
+          BookAboutScreen(
+            bookId: s.pathParameters['bookId'] ?? '',
+            book: s.extra is Book ? s.extra as Book : null,
+          ),
+        ),
       ),
       GoRoute(
         path: AppRoutes.document,
@@ -228,6 +241,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             ),
           );
         },
+      ),
+      GoRoute(
+        path: AppRoutes.habits,
+        pageBuilder: (c, s) => slideUpPage(s, const HabitsEntry()),
       ),
       GoRoute(
         path: AppRoutes.notes,

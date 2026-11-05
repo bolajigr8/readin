@@ -102,6 +102,8 @@ class EpubView extends StatefulWidget {
     required int spineIndex,
     required String chapterTitle,
     required String href,
+    int page,
+    int pages,
   }) onLocation;
   final void Function(String text, String cfiRange) onTextSelected;
   final VoidCallback onTap;
@@ -134,6 +136,7 @@ class _EpubViewState extends State<EpubView> {
           'initialCfi': widget.initialCfi,
           ...widget.prefs.toPageJson(),
           'flow': widget.prefs.flow,
+          'pageAnim': widget.prefs.pageAnim,
         },
       );
       if (_disposed) {
@@ -185,6 +188,8 @@ class _EpubViewState extends State<EpubView> {
           spineIndex: d['chapterIndex'] is num ? (d['chapterIndex'] as num).toInt() : 0,
           chapterTitle: (d['chapterTitle'] ?? '').toString(),
           href: (d['href'] ?? '').toString(),
+          page: d['page'] is num ? (d['page'] as num).toInt() : 0,
+          pages: d['pages'] is num ? (d['pages'] as num).toInt() : 0,
         );
       case 'TEXT_SELECTED':
         widget.onTextSelected(

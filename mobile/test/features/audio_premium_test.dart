@@ -67,14 +67,14 @@ void main() {
 
     setUp(() {
       tts = FakeTts();
-      c = AudioController(tts)
+      c = AudioController(tts, useNotification: false)
         ..load(bookId: '1', title: 'T', coverUrl: '', text: _text);
     });
     tearDown(() => c.dispose());
 
     // Force one chunk per sentence for deterministic tests.
     AudioController five() {
-      final x = AudioController(tts);
+      final x = AudioController(tts, useNotification: false);
       x.load(bookId: '1', title: 'T', coverUrl: '', text: _text);
       return x;
     }

@@ -14,13 +14,14 @@ import 'package:flutter/services.dart' show rootBundle;
 /// Every URL starts with a random per-session token, so other apps on the
 /// phone cannot read the book through the loopback port.
 class ReaderServer {
-  ReaderServer._(this._server, this.token, this._book, this._config, this._assets);
+  ReaderServer._(this._server, this.token, this._book, this._config, this._assets, this._bytes);
 
   final HttpServer _server;
   final String token;
   final File _book;
   final Map<String, dynamic> _config;
   final Future<String> Function(String assetName) _assets;
+  final Future<List<int>> Function(String assetName) _bytes;
 
   /// The page the WebView loads.
   Uri get pageUrl =>
@@ -38,6 +39,7 @@ class ReaderServer {
     required File bookFile,
     required Map<String, dynamic> config,
     Future<String> Function(String assetName)? loadAsset,
+    Future<List<int>> Function(String assetName)? loadBytes,
   }) async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     final rnd = Random.secure();
@@ -51,6 +53,8 @@ class ReaderServer {
       bookFile,
       {...config, 'bookUrl': 'book.bin'},
       loadAsset ?? (name) => rootBundle.loadString('assets/reader/$name'),
+      loadBytes ??
+          (name) async => (await rootBundle.load('assets/reader/$name')).buffer.asUint8List(),
     );
     server.listen(s._handle, onError: (_) {});
     return s;
@@ -60,13 +64,27 @@ class ReaderServer {
     final res = req.response;
     try {
       final segs = req.uri.pathSegments;
-      if (req.method != 'GET' || segs.length != 2 || segs[0] != token) {
+      // `/<token>/fonts/<name>.woff2` — the fonts bundled with the app (work offline).
+      final isFont = segs.length == 3 &&
+          segs[1] == 'fonts' &&
+          RegExp(r'^[a-z0-9-]{1,60}\.woff2$').hasMatch(segs[2]);
+      if (req.method != 'GET' || segs.isEmpty || segs[0] != token || !(segs.length == 2 || isFont)) {
         res.statusCode = HttpStatus.notFound;
         await res.close();
         return;
       }
 
       res.headers.set('Cache-Control', 'no-store');
+
+      if (isFont) {
+        final bytes = await _bytes('fonts/${segs[2]}');
+        res.headers.contentType = ContentType('font', 'woff2');
+        res.headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+        res.contentLength = bytes.length;
+        res.add(bytes);
+        await res.close();
+        return;
+      }
 
       switch (segs[1]) {
         case 'reader.html':

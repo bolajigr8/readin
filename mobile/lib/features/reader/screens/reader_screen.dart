@@ -1,3 +1,4 @@
+import '../../billing/limit_dialog.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -13,7 +14,6 @@ import '../../../core/services/routes.dart';
 import '../../../core/services/volume_keys.dart';
 import '../../../theme/app_typography.dart';
 import '../../../widgets/app_toast.dart';
-import '../../../widgets/confirm_dialog.dart';
 import '../../../widgets/pressable_opacity.dart';
 import '../../audio/providers/audio_controller.dart' show speedLabel;
 import '../../ambient/ambient.dart';
@@ -32,11 +32,17 @@ import '../widgets/epub_view.dart';
 import '../widgets/highlight_menu.dart';
 import '../widgets/note_editor_sheet.dart';
 import '../widgets/pdf_view.dart';
+import '../widgets/reader_quick_settings.dart';
 import '../widgets/reader_settings_sheet.dart';
 import '../widgets/reader_toolbar.dart';
 import '../widgets/tap_detector.dart';
 import '../data/dictionary_service.dart';
 import '../data/reader_models.dart';
+
+/// Height of the top bar (below the status bar) and of the bottom bar (above
+/// the navigation bar): reserved so the page text is never under them.
+const double _kTopZone = 56;
+const double _kBottomZone = 88;
 
 const String _localToast =
     'Save to library to use highlights/notes/bookmarks/annotations.';
@@ -62,6 +68,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
   bool _tocOpen = false;
   bool _settingsOpen = false;
+  bool _quickOpen = false; // the small ⚙ settings panel (EPUB)
   bool _annotationsOpen = false;
 
   String _selText = '';
@@ -73,6 +80,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   bool _volumeOn = false;
 
   ProviderContainer? _container;
+  bool _listenStarted = false;
   int _autoLevel = 0;
   bool _nightNow = false;
   Timer? _nightTimer;
@@ -147,7 +155,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     _hideTimer?.cancel();
     _hideTimer = Timer(const Duration(milliseconds: 3500), () {
       if (!mounted) return;
-      if (_tocOpen || _settingsOpen || _annotationsOpen || _menuVisible) {
+      if (_tocOpen || _settingsOpen || _quickOpen || _annotationsOpen || _menuVisible) {
         _restartHideTimer(); // never hide while a panel is open
         return;
       }
@@ -173,12 +181,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     );
   }
 
-  bool get _anyOverlay => _tocOpen || _settingsOpen || _annotationsOpen || _menuVisible;
+  bool get _anyOverlay => _tocOpen || _settingsOpen || _quickOpen || _annotationsOpen || _menuVisible;
 
   void _closeOverlays() {
     setState(() {
       _tocOpen = false;
       _settingsOpen = false;
+      _quickOpen = false;
       _annotationsOpen = false;
       _menuVisible = false;
     });
@@ -189,6 +198,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     setState(() {
       _tocOpen = toc;
       _settingsOpen = settings;
+      _quickOpen = false;
       _annotationsOpen = annotations;
       _menuVisible = false;
     });
@@ -251,14 +261,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   }
 
   Future<void> _handleLimit(AppException e) async {
-    final upgrade = await showConfirmDialog(
+    final upgrade = await showLimitDialog(
       context,
+      ref,
       title: 'Annotation Limit Reached',
       message: e.message,
-      confirmLabel: 'Upgrade',
-      cancelLabel: 'Not now',
     );
-    if (upgrade && mounted) context.go(AppRoutes.profile);
+    if (upgrade && mounted) context.push(AppRoutes.upgrade);
   }
 
   Future<void> _highlight(HighlightColor color) async {
@@ -589,6 +598,16 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         if (next) _restartHideTimer();
       },
     );
+    // Opened with the 🔊 button → start reading aloud once the first page is ready.
+    ref.listen(readerControllerProvider(_args).select((x) => x.page > 0 || x.percentage > 0),
+        (prev, next) {
+      if (next && _args.listen && !_listenStarted) {
+        _listenStarted = true;
+        Future<void>.delayed(const Duration(milliseconds: 900), () {
+          if (mounted) _toggleReadAloud();
+        });
+      }
+    });
     // Draw saved highlights once the book is displayed and annotations loaded.
     ref.listen(readerControllerProvider(_args).select((x) => x.engineReady),
         (prev, next) {
@@ -643,9 +662,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     final path = s.filePath!;
     final centerLabel = s.isPdf
         ? (s.pdfPages > 0 ? 'Page ${s.pdfPage} of ${s.pdfPages}' : 'Reading...')
-        : (s.toc.isNotEmpty && s.engineReady
-            ? 'Chapter ${s.chapterIndex + 1} of ${s.toc.length}'
-            : 'Reading...');
+        : (s.page > 0
+            ? '${s.page} of ${s.pages}'
+            : (s.toc.isNotEmpty && s.engineReady
+                ? 'Chapter ${s.chapterIndex + 1} of ${s.toc.length}'
+                : 'Reading...'));
     final navEnabled = s.isPdf ? s.pdfPages > 0 : s.toc.isNotEmpty;
     final bookmarked = bms.byCfi(s.currentCfi) != null;
 
@@ -654,7 +675,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       children: [
         // Page content, clear of the system bars (constant size in immersive).
         Padding(
-          padding: EdgeInsets.fromLTRB(0, insets.top, 0, insets.bottom),
+          // The text area is FIXED between the two bar zones, so showing or
+          // hiding the bars never covers (or re-flows) the page.
+          padding: EdgeInsets.fromLTRB(0, insets.top + _kTopZone, 0, insets.bottom + _kBottomZone),
           child: s.isPdf
               ? TapDetector(
                   onTap: (_) => _toggleToolbar(),
@@ -712,6 +735,44 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
             child: _OpeningOverlay(),
           ),
 
+        // Slim footer in the bottom zone while the bars are hidden.
+        Positioned(
+          left: 24,
+          right: 24,
+          bottom: insets.bottom + 14,
+          child: IgnorePointer(
+            child: AnimatedOpacity(
+              opacity: s.toolbarVisible ? 0 : 1,
+              duration: const Duration(milliseconds: 200),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      s.chapterTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.label(
+                        size: 11,
+                        color: palette.fg.withValues(alpha: 0.55),
+                      ),
+                    ),
+                  ),
+                  Text(
+                    s.isPdf
+                        ? (s.pdfPages > 0 ? '${s.pdfPage} of ${s.pdfPages}' : '')
+                        : (s.page > 0 ? '${s.page} of ${s.pages}' : '${s.percentage}%'),
+                    style: AppTypography.label(
+                      size: 11,
+                      weight: FontWeight.w600,
+                      color: palette.fg.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+
         ReaderToolbar(
           title: s.title,
           visible: s.toolbarVisible,
@@ -733,7 +794,21 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
               _openPanel(toc: true);
             }
           },
-          onSettings: () => _openPanel(settings: true),
+          // EPUB: the small panel; PDF has no font settings → the full panel.
+          onSettings: () {
+            if (s.isPdf) {
+              _openPanel(settings: true);
+            } else {
+              setState(() {
+                _quickOpen = !_quickOpen;
+                _tocOpen = false;
+                _settingsOpen = false;
+                _annotationsOpen = false;
+                _menuVisible = false;
+              });
+              _ctl.setToolbar(true);
+            }
+          },
           onPrev: () => _prevChapter(s),
           onNext: () => _nextChapter(s),
         ),
@@ -783,6 +858,40 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
           },
         ),
 
+        // Small ⚙ panel under the top bar (tap outside to close).
+        if (_quickOpen && !s.isPdf) ...[
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () => setState(() => _quickOpen = false),
+            ),
+          ),
+          Positioned(
+            top: insets.top + 54,
+            right: 8,
+            width: (MediaQuery.sizeOf(context).width.clamp(0.0, 320.0) - 16).toDouble(),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.74),
+              child: ReaderQuickSettings(
+                prefs: s.prefs,
+                onFlow: _ctl.setFlow,
+                onTheme: _ctl.setTheme,
+                onFontFamily: _ctl.setFontFamily,
+                onFontSize: _ctl.setFontSize,
+                onFontWeight: _ctl.setFontWeight,
+                onLineHeight: _ctl.setLineHeight,
+                onAlignMode: (m) {
+                  _ctl.setAlign(m == 0 ? 'left' : 'justify');
+                  _ctl.setHyphenate(m == 2);
+                },
+                onMarginsOn: (on) => _ctl.setMargin(on ? 32 : 6),
+                onPageAnim: _ctl.setPageAnim,
+                onGeneral: () => _openPanel(settings: true),
+              ),
+            ),
+          ),
+        ],
+
         ReaderSettingsSheet(
           isOpen: _settingsOpen,
           onClose: () => setState(() => _settingsOpen = false),
@@ -798,6 +907,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
           onBrightness: _ctl.setBrightness,
           onVolumeKeys: _ctl.setVolumeKeys,
           onWarmth: _ctl.setWarmth,
+          onFontWeight: _ctl.setFontWeight,
+          onHyphenate: _ctl.setHyphenate,
+          onPageAnim: _ctl.setPageAnim,
           onAutoNight: (v) {
             _ctl.setAutoNight(v);
             _applyTheme();

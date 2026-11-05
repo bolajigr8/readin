@@ -23,6 +23,11 @@ sub-project. Do NOT change any file yet.
 Ask me questions only for things you cannot find in the code or docs.
 ```
 
+## Never lose the conversation
+* Every time you start work: `cd` into the inner `Book-App` folder, then `claude --continue` (reopens the most recent conversation) or `claude --resume` (pick an older one). Use plain `claude` only for a brand-new topic.
+* If a resumed conversation feels forgetful, or after a restart, run `/resume` — it reads `NEXT.md` and the latest session logs and tells you where you stopped.
+* The project also saves its own memory in `project/docs/NEXT.md` and `project/docs/sessions/`; Claude Code updates them as it works. Commit them with your code.
+
 ## Then, stage by stage
 `/stage S0` → approve → tests pass → commit → `/stage S1` … (S1 first needs you to create the keystore — Claude Code will tell you the exact command and what to back up).
 Useful: `/verify-all` anytime · `/release-apk 1.0.0` when S1–S3 are done · `/play-audit` before submitting to Play · `/handoff` at the end of every session.

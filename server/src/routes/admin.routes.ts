@@ -6,6 +6,7 @@ import {
   getBilling,
   listPayments,
   setBilling,
+  testPaystack,
   verifyUserEmail,
   getConfig,
   getStats,
@@ -31,6 +32,7 @@ router.put('/config/features/:key', setFeatureConfig)
 
 router.get('/billing', getBilling)
 router.put('/billing', setBilling)
+router.post('/billing/test', testPaystack)
 router.get('/payments', listPayments)
 
 router.get('/users', listUsers)

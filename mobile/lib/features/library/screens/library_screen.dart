@@ -1,3 +1,6 @@
+import '../../billing/billing_providers.dart';
+import '../../device/device_files.dart';
+import '../../device/device_files_view.dart';
 import '../../shelves/widgets/shelf_widgets.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -39,7 +42,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     super.initState();
     _search = TextEditingController(text: ref.read(librarySearchProvider));
     _upgradeTap = TapGestureRecognizer()
-      ..onTap = () => context.go(AppRoutes.profile);
+      ..onTap = () => context.push(AppRoutes.upgrade);
   }
 
   @override
@@ -126,6 +129,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           ),
         ),
 
+        const LibraryModeSwitch(),
+        if (ref.watch(libraryModeProvider) == 1)
+          const Expanded(child: DeviceFilesView())
+        else ...[
         // Search bar
         Container(
           margin: const EdgeInsets.only(left: 16, right: 16, top: 12),
@@ -237,25 +244,27 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 Expanded(
                   child: Text.rich(
                     TextSpan(
-                      text: '10-book limit reached. ',
+                      text: '${ref.watch(publicConfigProvider).billing.freeLimitText} limit reached. ',
                       style: AppTypography.label(
                         size: 13,
                         color: AppColors.textSecondary,
                         lineHeight: 18,
                       ),
-                      children: [
-                        TextSpan(
-                          text: 'Upgrade to Premium',
-                          recognizer: _upgradeTap,
-                          style: AppTypography.label(
-                            size: 13,
-                            weight: FontWeight.w600,
-                            color: AppColors.amber400,
-                            lineHeight: 18,
-                          ),
-                        ),
-                        const TextSpan(text: ' for unlimited books.'),
-                      ],
+                      children: ref.watch(billingVisibleProvider)
+                          ? [
+                              TextSpan(
+                                text: 'Upgrade to Premium',
+                                recognizer: _upgradeTap,
+                                style: AppTypography.label(
+                                  size: 13,
+                                  weight: FontWeight.w600,
+                                  color: AppColors.amber400,
+                                  lineHeight: 18,
+                                ),
+                              ),
+                              const TextSpan(text: ' for unlimited books.'),
+                            ]
+                          : [const TextSpan(text: 'Remove a book to add a new one.')],
                     ),
                   ),
                 ),
@@ -275,6 +284,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
         const ShelfFilterBar(),
         Expanded(child: content),
+        ],
       ],
     );
   }

@@ -1,5 +1,11 @@
 import 'package:google_sign_in/google_sign_in.dart';
 
+/// Google sign-in is switched OFF for now (e-mail + password only).
+/// To bring it back: set this to `true`, run with
+/// `--dart-define=GOOGLE_SERVER_CLIENT_ID=<web client id>`, and make sure the
+/// server has GOOGLE_CLIENT_ID set (see server/ADMIN_SETUP.md).
+const bool kGoogleSignInEnabled = false;
+
 /// Plain profile returned by Google (decoupled from the plugin types).
 class GoogleProfile {
   const GoogleProfile({
