@@ -185,9 +185,11 @@ class _ToastBannerState extends State<_ToastBanner>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: AppColors.alpha(color, 0x18),
+          // SOLID (fully opaque) background: a tint of the toast colour on top of a
+          // dark base, so nothing behind the toast ever shows through the text.
+          color: Color.alphaBlend(color.withValues(alpha: 0.28), const Color(0xFF18181B)),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.alpha(color, 0x40)),
+          border: Border.all(color: color.withValues(alpha: 0.85), width: 1.2),
           // RN: shadow #000 / .3 / offset 0,4 / radius 8
           boxShadow: [
             BoxShadow(
@@ -199,14 +201,14 @@ class _ToastBannerState extends State<_ToastBanner>
         ),
         child: Row(
           children: [
-            Icon(icon, size: 18, color: color),
+            Icon(icon, size: 20, color: AppColors.white),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
                 widget.data.message,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
-                style: AppTypography.label(size: 14, lineHeight: 20),
+                style: AppTypography.label(size: 14, lineHeight: 20, color: AppColors.white),
               ),
             ),
             const SizedBox(width: 10),
@@ -215,8 +217,8 @@ class _ToastBannerState extends State<_ToastBanner>
               onTap: _dismiss,
               child: const Icon(
                 Ionicons.close,
-                size: 15,
-                color: AppColors.textMuted,
+                size: 16,
+                color: AppColors.white,
               ),
             ),
           ],

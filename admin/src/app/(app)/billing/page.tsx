@@ -204,6 +204,22 @@ function CopyField({ label, value }: { label: string; value: string }) {
 }
 
 function PaystackCard({ paystack }: { paystack: BillingView['paystack'] }) {
+  const [testing, setTesting] = useState(false)
+  const [result, setResult] = useState<{ ok: boolean; message: string; detail: string } | null>(null)
+
+  async function runTest() {
+    setTesting(true)
+    setResult(null)
+    try {
+      const r = await api<{ ok: boolean; message: string; detail: string }>('billing/test', { method: 'POST', body: {} })
+      setResult(r)
+    } catch (e) {
+      setResult({ ok: false, message: e instanceof Error ? e.message : 'The test could not run.', detail: '' })
+    } finally {
+      setTesting(false)
+    }
+  }
+
   return (
     <Card>
       <CardHeader className="flex-row items-start justify-between gap-4">
@@ -234,6 +250,20 @@ function PaystackCard({ paystack }: { paystack: BillingView['paystack'] }) {
             Payments here use Paystack&rsquo;s test cards and move no real money &mdash; perfect for trying everything. When you are ready, replace the key with your live key (<code>sk_live_…</code>) on the server.
           </Callout>
         )}
+        <div className="grid gap-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <Button variant="outline" size="sm" onClick={runTest} disabled={testing || !paystack.configured}>
+              {testing ? <Loader2 className="animate-spin" /> : <RefreshCw />} Test connection
+            </Button>
+            <span className="text-xs text-muted-foreground">Checks the secret key and that your server can reach Paystack — without charging anyone.</span>
+          </div>
+          {result && (
+            <Callout tone={result.ok ? 'tip' : 'warning'} title={result.ok ? 'Paystack is working' : 'Paystack is not working yet'}>
+              {result.message}
+              {result.detail && <span className="mt-1 block font-mono text-xs">{result.detail}</span>}
+            </Callout>
+          )}
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <CopyField label="Webhook URL (paste into Paystack)" value={paystack.webhookUrl} />
           <CopyField label="Return page (set automatically)" value={paystack.callbackUrl} />

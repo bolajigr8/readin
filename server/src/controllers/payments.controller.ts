@@ -57,7 +57,7 @@ export const checkout = asyncHandler(async (req: Request, res: Response) => {
     metadata: { userId: String(user._id), planId: plan.id, planName: plan.name },
   })
   if (!init.ok || !init.data) {
-    console.error('[payments] initialize failed:', init.status, init.message)
+    console.error('[payments] initialize failed:', init.status, init.message, init.raw ? `| body: ${init.raw}` : '')
     errorResponse(res, 'Could not start the payment. Please try again.', 502)
     return
   }

@@ -1,0 +1,13 @@
+Reader fonts bundled with ReadIn (offline reading)
+
+Merriweather, Literata, Lora, Lexend, Atkinson Hyperlegible, OpenDyslexic —
+all distributed under the SIL Open Font License 1.1 (free for personal and
+commercial use, including bundling in apps). Font files from the Fontsource
+packages (@fontsource/*). Copyright belongs to each font's authors:
+  Merriweather — The Merriweather Project Authors
+  Literata     — The Literata Project Authors
+  Lora         — The Lora Project Authors
+  Lexend       — The Lexend Project Authors
+  Atkinson Hyperlegible — Braille Institute of America, Inc.
+  OpenDyslexic — Abbie Gonzalez
+Full licence text: https://openfontlicense.org

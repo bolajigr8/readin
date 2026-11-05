@@ -123,14 +123,17 @@ class ReaderPrefs {
     required this.fontSize,
     required this.fontFamily,
     required this.theme,
-    this.lineHeight = 1.6,
-    this.margin = 16,
-    this.align = 'left',
+    this.lineHeight = 1.5,
+    this.margin = 32,
+    this.align = 'justify',
     this.flow = 'paged',
     this.brightness = 1.0,
     this.volumeKeys = true,
     this.warmth = 0.0,
     this.autoNight = false,
+    this.hyphenate = true,
+    this.fontWeight = 700,
+    this.pageAnim = 'slide',
   });
 
   final double fontSize;
@@ -165,6 +168,15 @@ class ReaderPrefs {
   /// Use the Night theme automatically in the evening.
   final bool autoNight;
 
+  /// Hyphenate justified text (smooth right edge, like a printed book).
+  final bool hyphenate;
+
+  /// 300 light · 400 normal · 700 bold · 900 extra bold.
+  final int fontWeight;
+
+  /// How a page turn looks: 'slide' (eased slide) or 'none' (instant).
+  final String pageAnim;
+
   bool get isScroll => flow == 'scroll';
 
   ReaderPrefs copyWith({
@@ -179,6 +191,9 @@ class ReaderPrefs {
     bool? volumeKeys,
     double? warmth,
     bool? autoNight,
+    bool? hyphenate,
+    int? fontWeight,
+    String? pageAnim,
   }) =>
       ReaderPrefs(
         fontSize: fontSize ?? this.fontSize,
@@ -192,6 +207,9 @@ class ReaderPrefs {
         volumeKeys: volumeKeys ?? this.volumeKeys,
         warmth: warmth ?? this.warmth,
         autoNight: autoNight ?? this.autoNight,
+        hyphenate: hyphenate ?? this.hyphenate,
+        fontWeight: fontWeight ?? this.fontWeight,
+        pageAnim: pageAnim ?? this.pageAnim,
       );
 
   /// What the page needs for typography (no brightness / volume keys / flow).
@@ -202,6 +220,9 @@ class ReaderPrefs {
         'lineHeight': lineHeight,
         'margin': margin.round(),
         'align': align,
+        'hyphenate': hyphenate,
+        'fontWeight': fontWeight,
+        'pageAnim': pageAnim,
       };
 
   @override
@@ -217,12 +238,15 @@ class ReaderPrefs {
       other.brightness == brightness &&
       other.volumeKeys == volumeKeys &&
       other.warmth == warmth &&
-      other.autoNight == autoNight;
+      other.autoNight == autoNight &&
+      other.hyphenate == hyphenate &&
+      other.fontWeight == fontWeight &&
+      other.pageAnim == pageAnim;
 
   @override
   int get hashCode => Object.hash(
         fontSize, fontFamily, theme, lineHeight, margin, align, flow, brightness, volumeKeys,
-        warmth, autoNight,
+        warmth, autoNight, hyphenate, fontWeight, pageAnim,
       );
 }
 
@@ -247,3 +271,40 @@ class SearchHit {
         excerpt: (j['excerpt'] ?? '').toString().replaceAll(RegExp(r'\s+'), ' ').trim(),
       );
 }
+
+
+/// One font the reader can use (all bundled with the app, so they work offline).
+class ReaderFont {
+  const ReaderFont(this.id, this.label, {this.note = ''});
+  final String id;
+  final String label;
+  final String note;
+}
+
+const List<ReaderFont> kReaderFonts = [
+  ReaderFont('merriweather', 'Merriweather', note: 'default'),
+  ReaderFont('literata', 'Literata'),
+  ReaderFont('lora', 'Lora'),
+  ReaderFont('lexend', 'Lexend', note: 'easy reading'),
+  ReaderFont('atkinson', 'Atkinson Hyperlegible', note: 'high clarity'),
+  ReaderFont('opendyslexic', 'OpenDyslexic', note: 'dyslexia-friendly'),
+  ReaderFont('serif', 'Serif (system)'),
+  ReaderFont('sans-serif', 'Sans (system)'),
+];
+
+String readerFontLabel(String id) => kReaderFonts.firstWhere((f) => f.id == id, orElse: () => kReaderFonts.first).label;
+
+bool isReaderFont(String id) => kReaderFonts.any((f) => f.id == id);
+
+/// Font thickness steps (the slider): light · normal · bold · extra bold.
+const List<int> kFontWeights = [300, 400, 700, 900];
+
+String fontWeightLabel(int w) => switch (w) {
+      300 => 'Light',
+      400 => 'Normal',
+      900 => 'Extra bold',
+      _ => 'Bold',
+    };
+
+/// Line spacing is shown as a percentage of the normal spacing (1.5 = 100 %).
+int lineSpacingPercent(double lineHeight) => (lineHeight / 1.5 * 100).round();

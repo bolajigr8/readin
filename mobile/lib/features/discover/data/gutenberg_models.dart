@@ -74,15 +74,20 @@ class GutenbergPage {
     required this.count,
     required this.hasNext,
     required this.results,
+    this.fromCache = false,
   });
 
   final int count;
   final bool hasNext;
   final List<GutenbergBook> results;
 
-  factory GutenbergPage.fromJson(Map<String, dynamic> j) {
+  /// Shown from the last saved copy because Gutenberg could not be reached.
+  final bool fromCache;
+
+  factory GutenbergPage.fromJson(Map<String, dynamic> j, {bool fromCache = false}) {
     final res = j['results'];
     return GutenbergPage(
+      fromCache: fromCache,
       count: j['count'] is num ? (j['count'] as num).toInt() : 0,
       hasNext: j['next'] != null,
       results: res is List

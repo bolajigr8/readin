@@ -1,3 +1,6 @@
+import '../../../widgets/app_toast.dart';
+import '../../billing/billing_providers.dart';
+import '../data/google_sign_in_service.dart' show kGoogleSignInEnabled;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -32,6 +35,10 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   String? _emailError;
   String? _passwordError;
   String? _general;
+
+  /// The server said the e-mail is not confirmed yet → offer a new link.
+  bool _needsVerify = false;
+  bool _resending = false;
   bool _isLoading = false;
   bool _isGoogleLoading = false;
 
@@ -69,8 +76,19 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       if (!ok) {
         final err = ref.read(authProvider).error;
         _general = err == null ? null : loginErrorMessage(err);
+        _needsVerify = err != null && err.statusCode == 403 && err.message.toLowerCase().contains('verify');
       }
     });
+  }
+
+  Future<void> _resend() async {
+    final email = _email.text.trim();
+    if (email.isEmpty || _resending) return;
+    setState(() => _resending = true);
+    await ref.read(billingApiProvider).resendVerification(email);
+    if (!mounted) return;
+    setState(() => _resending = false);
+    AppToast.success('If that account still needs confirming, a new link is on its way. Check your inbox and spam folder.');
   }
 
   Future<void> _google() async {
@@ -127,6 +145,17 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         children: [
           if (_general != null) ...[
             ErrorBanner(message: _general!),
+            if (_needsVerify)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: _resending ? null : _resend,
+                  child: Text(
+                    _resending ? 'Sending…' : 'Resend the confirmation e-mail',
+                    style: AppTypography.label(size: 13, weight: FontWeight.w600, color: AppColors.primary500),
+                  ),
+                ),
+              ),
             const SizedBox(height: 16),
           ],
           AppTextField(
@@ -180,21 +209,24 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             onPressed: _login,
           ),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              const Expanded(child: _Line()),
-              const SizedBox(width: 12),
-              Text(
-                'or continue with',
-                style: AppTypography.label(size: 12, color: AppColors.textMuted),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(child: _Line()),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _GoogleButton(loading: _isGoogleLoading, onTap: _google),
-          const SizedBox(height: 16),
+          // Google sign-in is OFF for now — see kGoogleSignInEnabled.
+          if (kGoogleSignInEnabled) ...[
+            Row(
+              children: [
+                const Expanded(child: _Line()),
+                const SizedBox(width: 12),
+                Text(
+                  'or continue with',
+                  style: AppTypography.label(size: 12, color: AppColors.textMuted),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(child: _Line()),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _GoogleButton(loading: _isGoogleLoading, onTap: _google),
+            const SizedBox(height: 16),
+          ],
           AuthLinkRow(
             prompt: "Don't have an account?",
             action: 'Sign up',

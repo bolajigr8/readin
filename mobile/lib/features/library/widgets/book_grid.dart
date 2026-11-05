@@ -1,3 +1,4 @@
+import 'book_list_tile.dart';
 import 'package:flutter/material.dart';
 
 import '../../../constants/app_colors.dart';
@@ -36,12 +37,18 @@ class BookGrid extends StatelessWidget {
     final cols = columns == 1 ? 1 : 2;
     final rowCount = (books.length / cols).ceil();
 
-    Widget card(Book b) => BookCard(
-          book: b,
-          onTap: () => onBookTap(b),
-          onLongPress:
-              onBookLongPress == null ? null : () => onBookLongPress!(b),
-        );
+    Widget card(Book b) => cols == 1
+        ? BookListTile(
+            book: b,
+            onTap: () => onBookTap(b),
+            onMore: () => onBookLongPress?.call(b),
+          )
+        : BookCard(
+            book: b,
+            onTap: () => onBookTap(b),
+            onLongPress:
+                onBookLongPress == null ? null : () => onBookLongPress!(b),
+          );
 
     final scroll = LayoutBuilder(
       builder: (context, box) {

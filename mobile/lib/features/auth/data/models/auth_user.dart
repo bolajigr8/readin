@@ -7,6 +7,7 @@ class AuthUser {
     required this.avatar,
     required this.plan,
     required this.isEmailVerified,
+    this.premiumUntil,
   });
 
   final String id;
@@ -17,6 +18,9 @@ class AuthUser {
   /// `'free'` or `'premium'`.
   final String plan;
   final bool isEmailVerified;
+
+  /// End of the paid Premium period (null = no end date, e.g. given by an admin).
+  final DateTime? premiumUntil;
 
   bool get isPremium => plan == 'premium';
 
@@ -34,6 +38,7 @@ class AuthUser {
       avatar: (json['avatar'] ?? '').toString(),
       plan: (json['plan'] ?? 'free').toString(),
       isEmailVerified: json['isEmailVerified'] == true,
+      premiumUntil: DateTime.tryParse('${json['premiumUntil'] ?? ''}'),
     );
   }
 
@@ -44,9 +49,16 @@ class AuthUser {
         'avatar': avatar,
         'plan': plan,
         'isEmailVerified': isEmailVerified,
+        if (premiumUntil != null) 'premiumUntil': premiumUntil!.toIso8601String(),
       };
 
-  AuthUser copyWith({String? plan, String? displayName, String? avatar}) =>
+  AuthUser copyWith({
+    String? plan,
+    String? displayName,
+    String? avatar,
+    DateTime? premiumUntil,
+    bool clearPremiumUntil = false,
+  }) =>
       AuthUser(
         id: id,
         email: email,
@@ -54,5 +66,6 @@ class AuthUser {
         avatar: avatar ?? this.avatar,
         plan: plan ?? this.plan,
         isEmailVerified: isEmailVerified,
+        premiumUntil: clearPremiumUntil ? null : (premiumUntil ?? this.premiumUntil),
       );
 }

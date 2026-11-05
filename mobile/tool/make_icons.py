@@ -1,4 +1,4 @@
-"""Generates the ReadIn launcher icon (adaptive + legacy + monochrome) and the
+"""Generates the ReadIn launcher icon (open book, no letter; adaptive + legacy + monochrome) and the
 splash logo with Pillow. Usage:  python3 tool/make_icons.py
 Writes into android/app/src/main/res and assets/icons|images."""
 import os
@@ -21,7 +21,7 @@ def bezier(p0, p1, p2, n=40):
 
 
 def art(mono=False):
-    """The logo mark (R above an open book) on a transparent 1024-unit canvas."""
+    """The logo mark (an open book with a bookmark) on a transparent 1024-unit canvas."""
     k = S / 1024
     img = Image.new('RGBA', (S, S), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
@@ -49,17 +49,9 @@ def art(mono=False):
             d.line(pts([(235, y), (440, y - 14 + 6 * (i % 2))]), fill=ORANGE, width=int(11 * k))
             d.line(pts([(1024 - 440, y - 14 + 6 * (i % 2)), (1024 - 235, y)]), fill=ORANGE, width=int(11 * k))
 
-    # the R
-    font = ImageFont.truetype(FONT, int(470 * k))
-    bbox = d.textbbox((0, 0), 'R', font=font)
-    w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
-    x = 512 * k - w / 2 - bbox[0]
-    y = 330 * k - h / 2 - bbox[1]
-    d.text((x, y), 'R', font=font, fill=WHITE if mono else DARK)
-
     if not mono:
         # amber bookmark ribbon on the right page
-        ribbon = [(832, 552), (832, 700), (864, 672), (896, 700), (896, 560)]
+        ribbon = [(770, 556), (770, 706), (800, 678), (830, 706), (830, 562)]
         d.polygon(pts(ribbon), fill=AMBER)
     return img
 
@@ -93,7 +85,7 @@ mono = art(mono=True)
 
 # ── master icon 1024 (rounded tile, art fills ~70 %) ───────────────────────
 tile = rounded(1024, 230, ORANGE)
-mark = fit(main, 700, 1024)
+mark = fit(main, 720, 1024)
 master = tile.copy()
 master.alpha_composite(mark)
 save(master, 'assets/icons/icon.png')
@@ -116,7 +108,7 @@ for dname, m in dens.items():
 
 # ── splash: the logo tile on the dark launch screen ────────────────────────
 splash = rounded(1024, 230, ORANGE)
-splash.alpha_composite(fit(main, 700, 1024))
+splash.alpha_composite(fit(main, 720, 1024))
 save(splash, 'assets/images/splash-icon.png')
 for dname, m in dens.items():
     save(splash, f'{RES}/drawable-{dname}/splash_icon.png', int(160 * m))

@@ -97,6 +97,8 @@ class ShelfFilterBar extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
         children: [
           chip('All', filter.isAll, () => ctl.state = const ShelfFilter.all()),
+          chip('★ Favorites', filter.shelfId == kFavoritesFilter,
+              () => ctl.state = const ShelfFilter.favorites()),
           chip('Reading', filter.status == ReadStatus.reading,
               () => ctl.state = const ShelfFilter.status(ReadStatus.reading)),
           chip('Want to read', filter.status == ReadStatus.want,

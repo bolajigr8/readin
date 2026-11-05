@@ -5,11 +5,14 @@ import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
+import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
+import android.provider.Settings
 import android.view.KeyEvent
 import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
@@ -43,6 +46,7 @@ class MainActivity : FlutterActivity() {
     companion object {
         private const val REQ_FOLDER = 4201
         private const val REQ_NOTIFICATIONS = 4202
+        private const val REQ_STORAGE = 4203
         private val SUPPORTED = setOf(
             "pdf", "epub", "mobi", "azw3", "fb2", "cbz", "cbr",
             "docx", "doc", "odt", "rtf", "xlsx", "xls", "csv",
@@ -78,6 +82,9 @@ class MainActivity : FlutterActivity() {
                     result.success(list)
                 }
                 "pickFolder" -> pickFolder(result)
+                "hasAllFilesAccess" -> result.success(hasAllFilesAccess())
+                "requestAllFilesAccess" -> { requestAllFilesAccess(); result.success(null) }
+                "scanDevice" -> scanDevice(result)
                 "openFile" -> openFile(call.argument("path"), call.argument("mime"), result)
                 "shareFile" -> shareFile(
                     call.argument("path"), call.argument("mime"), call.argument("text"), result,
@@ -94,6 +101,18 @@ class MainActivity : FlutterActivity() {
                 override fun onCancel(arguments: Any?) { incomingSink = null }
             }
         )
+
+        // ── reading-habit reminders (AlarmManager, see HabitAlarms.kt) ────────
+        MethodChannel(messenger, "readin/habits").setMethodCallHandler { call, result ->
+            when (call.method) {
+                "sync" -> {
+                    HabitAlarms.save(this, call.arguments as? String ?: "[]")
+                    result.success(null)
+                }
+                "askPermission" -> { askNotificationPermission(); result.success(null) }
+                else -> result.notImplemented()
+            }
+        }
 
         // ── read aloud (foreground service + notification) ────────────────────
         MethodChannel(messenger, "readin/readaloud").setMethodCallHandler { call, result ->
@@ -293,6 +312,79 @@ class MainActivity : FlutterActivity() {
                     val u = DocumentsContract.buildDocumentUriUsingTree(tree, id)
                     val p = copyToCache(u)
                     if (p != null) out.add(p)
+                }
+            }
+        }
+    }
+
+    // ── scan the whole phone for documents ────────────────────────────────────
+
+    private fun hasAllFilesAccess(): Boolean {
+        return if (Build.VERSION.SDK_INT >= 30) {
+            Environment.isExternalStorageManager()
+        } else {
+            checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) ==
+                PackageManager.PERMISSION_GRANTED
+        }
+    }
+
+    private fun requestAllFilesAccess() {
+        if (Build.VERSION.SDK_INT >= 30) {
+            try {
+                startActivity(
+                    Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+                        .setData(Uri.parse("package:$packageName")),
+                )
+            } catch (e: Exception) {
+                startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+            }
+        } else {
+            requestPermissions(arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE), REQ_STORAGE)
+        }
+    }
+
+    private val skipDirs = setOf(
+        "android", "cache", "thumbnails", ".thumbnails", "node_modules", "lost+found",
+        "trash", ".trash", "tmp", "temp", "obb",
+    )
+
+    private fun scanDevice(result: MethodChannel.Result) {
+        if (!hasAllFilesAccess()) {
+            result.error("NO_ACCESS", "All files access is not granted.", null)
+            return
+        }
+        io.execute {
+            val out = ArrayList<Map<String, Any>>()
+            try {
+                walkDevice(Environment.getExternalStorageDirectory(), 0, out)
+            } catch (e: Exception) {
+                // return what we found
+            }
+            main.post { result.success(out) }
+        }
+    }
+
+    private fun walkDevice(dir: File, depth: Int, out: MutableList<Map<String, Any>>) {
+        if (depth > 12 || out.size >= 5000) return
+        val children = dir.listFiles() ?: return
+        for (f in children) {
+            if (out.size >= 5000) return
+            val name = f.name
+            if (name.startsWith(".")) continue
+            if (f.isDirectory) {
+                if (skipDirs.contains(name.lowercase())) continue
+                walkDevice(f, depth + 1, out)
+            } else {
+                val ext = name.substringAfterLast('.', "").lowercase()
+                if (SUPPORTED.contains(ext) && f.length() > 2048) {
+                    out.add(
+                        mapOf(
+                            "path" to f.absolutePath,
+                            "name" to name,
+                            "size" to f.length(),
+                            "modified" to f.lastModified(),
+                        ),
+                    )
                 }
             }
         }

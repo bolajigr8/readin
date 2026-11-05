@@ -29,6 +29,9 @@ class ReaderSettingsSheet extends StatelessWidget {
     required this.onBrightness,
     required this.onVolumeKeys,
     required this.onWarmth,
+    required this.onFontWeight,
+    required this.onHyphenate,
+    required this.onPageAnim,
     required this.onAutoNight,
     required this.autoScrollLevel,
     required this.onAutoScroll,
@@ -51,6 +54,9 @@ class ReaderSettingsSheet extends StatelessWidget {
   final ValueChanged<double> onBrightness;
   final ValueChanged<bool> onVolumeKeys;
   final ValueChanged<double> onWarmth;
+  final ValueChanged<int> onFontWeight;
+  final ValueChanged<bool> onHyphenate;
+  final ValueChanged<String> onPageAnim;
   final ValueChanged<bool> onAutoNight;
 
   /// 0 off · 1 slow · 2 medium · 3 fast
@@ -155,26 +161,28 @@ class ReaderSettingsSheet extends StatelessWidget {
                 child: _WrapChips<String>(
                   value: prefs.fontFamily,
                   onSelect: onFontFamily,
-                  options: const [
-                    _Opt('Sans', 'sans-serif'),
-                    _Opt('Serif', 'serif'),
-                    _Opt('Literata', 'literata'),
-                    _Opt('Merriweather', 'merriweather'),
-                    _Opt('Lora', 'lora'),
-                    _Opt('Lexend · easy reading', 'lexend'),
-                    _Opt('Atkinson · high clarity', 'atkinson'),
-                    _Opt('OpenDyslexic', 'opendyslexic'),
+                  options: [
+                    for (final f in kReaderFonts)
+                      _Opt(f.note.isEmpty || f.note == 'default' ? f.label : '${f.label} · ${f.note}', f.id),
                   ],
                 ),
               ),
-              if (prefs.fontFamily != 'sans-serif' && prefs.fontFamily != 'serif')
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Text(
-                    'Web fonts download the first time you use them (needs internet).',
-                    style: AppTypography.label(size: 11, color: AppColors.textMuted),
-                  ),
+
+              _Block(
+                icon: Ionicons.text_outline,
+                color: AppColors.primary400,
+                label: 'Font Thickness',
+                child: _Chips<int>(
+                  value: prefs.fontWeight,
+                  onSelect: onFontWeight,
+                  options: const [
+                    _Opt('Light', 300),
+                    _Opt('Normal', 400),
+                    _Opt('Bold', 700),
+                    _Opt('Extra bold', 900),
+                  ],
                 ),
+              ),
 
               _Block(
                 icon: Ionicons.color_palette_outline,
@@ -198,13 +206,13 @@ class ReaderSettingsSheet extends StatelessWidget {
                   color: AppColors.blue500,
                   label: 'Line Spacing',
                   child: _Chips<double>(
-                    value: _nearest(prefs.lineHeight, const [1.4, 1.6, 1.8, 2.0]),
+                    value: _nearest(prefs.lineHeight, const [1.2, 1.5, 1.8, 2.1]),
                     onSelect: onLineHeight,
                     options: const [
-                      _Opt('Tight', 1.4),
-                      _Opt('Normal', 1.6),
+                      _Opt('Tight', 1.2),
+                      _Opt('Normal', 1.5),
                       _Opt('Relaxed', 1.8),
-                      _Opt('Airy', 2.0),
+                      _Opt('Airy', 2.1),
                     ],
                   ),
                 ),
@@ -213,11 +221,11 @@ class ReaderSettingsSheet extends StatelessWidget {
                   color: AppColors.success500,
                   label: 'Margins',
                   child: _Chips<double>(
-                    value: _nearest(prefs.margin, const [4.0, 16.0, 32.0]),
+                    value: _nearest(prefs.margin, const [8.0, 20.0, 32.0]),
                     onSelect: onMargin,
                     options: const [
-                      _Opt('Narrow', 4.0),
-                      _Opt('Medium', 16.0),
+                      _Opt('Narrow', 8.0),
+                      _Opt('Medium', 20.0),
                       _Opt('Wide', 32.0),
                     ],
                   ),
@@ -232,6 +240,43 @@ class ReaderSettingsSheet extends StatelessWidget {
                     options: const [
                       _Opt('Left', 'left'),
                       _Opt('Justified', 'justify'),
+                    ],
+                  ),
+                ),
+                if (prefs.align == 'justify')
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 20),
+                    child: Row(
+                      children: [
+                        const _IconTile(icon: Ionicons.menu_outline, color: AppColors.success500),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Hyphenation', style: AppTypography.label(size: 15, weight: FontWeight.w500)),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Breaks long words for an even right edge',
+                                style: AppTypography.label(size: 12, color: AppColors.textMuted),
+                              ),
+                            ],
+                          ),
+                        ),
+                        AppSwitch(value: prefs.hyphenate, onChanged: onHyphenate),
+                      ],
+                    ),
+                  ),
+                _Block(
+                  icon: Ionicons.play_forward_outline,
+                  color: AppColors.primary400,
+                  label: 'Page Turn Animation',
+                  child: _Chips<String>(
+                    value: prefs.pageAnim,
+                    onSelect: onPageAnim,
+                    options: const [
+                      _Opt('Slide', 'slide'),
+                      _Opt('None (instant)', 'none'),
                     ],
                   ),
                 ),

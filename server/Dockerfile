@@ -4,7 +4,7 @@ FROM node:20-slim AS builder
 WORKDIR /app
 
 # Enable pnpm via corepack
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@10.28.1 --activate
 
 # Install all dependencies (including devDeps for TypeScript compile)
 COPY package.json pnpm-lock.yaml ./
@@ -26,7 +26,7 @@ RUN apt-get update && \
 WORKDIR /app
 
 # Enable pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@10.28.1 --activate
 
 # Install production dependencies only
 COPY package.json pnpm-lock.yaml ./

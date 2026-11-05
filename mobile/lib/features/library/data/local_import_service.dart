@@ -4,9 +4,10 @@ import 'dart:math' as math;
 
 import 'package:crypto/crypto.dart';
 
-import '../../../core/api/api_result.dart';
 import '../../../core/formats.dart';
 import '../../import/data/import_models.dart' show titleFromFileName;
+import 'book_meta_store.dart';
+import 'epub_meta.dart';
 import 'local_library_store.dart';
 import 'models/book.dart';
 import 'repositories/library_repository.dart';
@@ -62,13 +63,16 @@ class LocalImportService {
     required LocalLibraryStore store,
     required LibraryRepository repo,
     required String? Function() userId,
+    BookMetaStore? meta,
   })  : _downloads = downloads,
+        _meta = meta ?? BookMetaStore(),
         _store = store,
         _repo = repo,
         _userId = userId;
 
   final DownloadService _downloads;
   final LocalLibraryStore _store;
+  final BookMetaStore _meta;
   final LibraryRepository _repo;
   final String? Function() _userId;
 
@@ -111,12 +115,15 @@ class LocalImportService {
       }
 
       final size = await file.length();
-      final title = titleFromFileName(name);
+      // EPUBs carry their own title / author / description / cover.
+      final epub = ext == 'epub' ? await readEpubMeta(path) : null;
+      final title = (epub?.title.isNotEmpty ?? false) ? epub!.title : titleFromFileName(name);
+      final author = epub?.author ?? '';
 
       // 1) Tell the server (best effort).
       final res = await _repo.registerLocal({
         'title': title,
-        'author': '',
+        'author': author,
         'format': ext,
         'fileSize': size,
         'fingerprint': fp,
@@ -138,7 +145,7 @@ class LocalImportService {
         book = Book(
           id: 'local_$fp',
           title: title,
-          author: '',
+          author: author,
           description: '',
           coverUrl: '',
           originalFileUrl: '',
@@ -162,6 +169,15 @@ class LocalImportService {
       // 2) Store the file next to the app's other books: books/<id>.<ext>
       await _downloads.importLocalCopy(bookId: book.id, source: file, format: ext);
       if (status == ImportStatus.pending) await _store.addPending(uid, book);
+
+      // Local details: summary, language and cover (shown in the About page / cards).
+      if (epub != null) {
+        await _meta.write(
+          book.id,
+          BookMeta(description: epub.description, language: epub.language),
+        );
+        if (epub.cover != null) await _meta.saveCover(book.id, epub.cover!);
+      }
 
       // A duplicate answered by the server still needs the file on THIS phone
       // (second device): that is exactly what the copy above did.
@@ -219,6 +235,11 @@ class LocalImportService {
         } on FileSystemException {
           // keep the old name; the book still opens through the pending record
         }
+      }
+      try {
+        await _meta.rename(b.id, data.book.id);
+      } catch (_) {
+        // cover/summary are optional extras
       }
       await _store.removePending(uid, b.id);
       synced++;

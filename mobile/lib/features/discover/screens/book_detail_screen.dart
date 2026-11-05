@@ -1,3 +1,4 @@
+import '../../billing/limit_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -16,7 +17,7 @@ import '../../audio/providers/audio_controller.dart';
 import '../../library/data/models/book.dart';
 import '../../library/providers/download_providers.dart';
 import '../../library/providers/library_providers.dart';
-import '../../library/screens/home_screen.dart' show openBook;
+import '../../library/screens/home_screen.dart' show readBookNow;
 import '../../library/widgets/book_cover.dart';
 import '../data/gutenberg_models.dart';
 import '../providers/add_to_library_provider.dart';
@@ -113,14 +114,13 @@ class _Content extends ConsumerWidget {
           AppToast.info('This book is already in your library.');
         } else if (e.statusCode == 403) {
           if (!context.mounted) return;
-          final upgrade = await showConfirmDialog(
+          final upgrade = await showLimitDialog(
             context,
+            ref,
             title: 'Library Limit Reached',
             message: e.message,
-            confirmLabel: 'Upgrade',
-            cancelLabel: 'Not now',
           );
-          if (upgrade) router.go(AppRoutes.profile);
+          if (upgrade) router.push(AppRoutes.upgrade);
         } else if (e is NetworkException || e is RequestTimeoutException) {
           AppToast.error('Could not add book. Check your connection.');
         } else {
@@ -254,7 +254,7 @@ class _Content extends ConsumerWidget {
                       if (libraryBook != null) ...[
                         const SizedBox(height: 10),
                         _ReadNowButton(
-                          onTap: () => openBook(context, libraryBook),
+                          onTap: () => readBookNow(context, libraryBook),
                         ),
                         const SizedBox(height: 10),
                         _OfflineSection(bookId: libraryBook.id, book: libraryBook),

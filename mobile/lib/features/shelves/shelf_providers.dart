@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/sync/doc_syncer.dart';
 import '../auth/providers/auth_providers.dart';
 import '../library/data/models/book.dart';
 import '../library/providers/library_providers.dart';
@@ -7,15 +8,50 @@ import 'shelf_models.dart';
 
 const String _kShelves = '@readin/shelves_v1';
 
+/// Pseudo shelf id of the ★ Favorites filter.
+const String kFavoritesFilter = '__favorites__';
+
 class ShelvesNotifier extends StateNotifier<ShelfData> {
   ShelvesNotifier(this._ref)
-      : super(ShelfData.decode(_ref.read(storageServiceProvider).readString(_kShelves)));
+      : super(ShelfData.decode(_ref.read(storageServiceProvider).readString(_kShelves))) {
+    _syncer = DocSyncer(
+      api: _ref.read(apiClientProvider),
+      storage: _ref.read(storageServiceProvider),
+      key: 'shelves',
+      readLocal: () => state.encode(),
+      isLocalEmpty: () =>
+          state.status.isEmpty && state.shelves.isEmpty && state.favorites.isEmpty,
+      applyRemote: (json) {
+        state = ShelfData.decode(json);
+        _ref.read(storageServiceProvider).writeString(_kShelves, json);
+      },
+      merge: (a, b) => mergeShelfData(ShelfData.decode(a), ShelfData.decode(b)).encode(),
+      enabled: () => _ref.read(authProvider).isAuthenticated,
+    );
+  }
 
   final Ref _ref;
+  late final DocSyncer _syncer;
+
+  @override
+  void dispose() {
+    _syncer.dispose();
+    super.dispose();
+  }
+
+  Future<void> pull() => _syncer.pull();
+
+  /// Sign-out: the next account must not see (or upload) this one's data.
+  void clearLocal() {
+    state = const ShelfData();
+    _ref.read(storageServiceProvider).writeString(_kShelves, '');
+    _ref.read(storageServiceProvider).writeInt('@readin/sync_v_shelves', 0);
+  }
 
   void _save(ShelfData d) {
     state = d;
     _ref.read(storageServiceProvider).writeString(_kShelves, d.encode());
+    _syncer.markChanged();
   }
 
   void setStatus(Book b, ReadStatus s) {
@@ -61,6 +97,12 @@ class ShelvesNotifier extends StateNotifier<ShelfData> {
         ],
       ));
 
+  void toggleFavorite(String bookId) {
+    final f = {...state.favorites};
+    f.contains(bookId) ? f.remove(bookId) : f.add(bookId);
+    _save(state.copyWith(favorites: f));
+  }
+
   void setYearlyGoal(int goal) => _save(state.copyWith(yearlyGoal: goal.clamp(1, 365).toInt()));
 }
 
@@ -74,6 +116,9 @@ class ShelfFilter {
         shelfId = null;
   const ShelfFilter.status(ReadStatus this.status) : shelfId = null;
   const ShelfFilter.shelf(String this.shelfId) : status = null;
+  const ShelfFilter.favorites()
+      : status = null,
+        shelfId = kFavoritesFilter;
 
   final ReadStatus? status;
   final String? shelfId;
@@ -93,6 +138,7 @@ final shelfFilterProvider = StateProvider<ShelfFilter>((ref) => const ShelfFilte
 List<Book> applyShelfFilter(List<Book> books, ShelfData d, ShelfFilter f) {
   if (f.isAll) return books;
   if (f.status != null) return books.where((b) => effectiveStatus(b, d) == f.status).toList();
+  if (f.shelfId == kFavoritesFilter) return books.where((b) => d.favorites.contains(b.id)).toList();
   final shelf = d.shelves.where((s) => s.id == f.shelfId).firstOrNull;
   if (shelf == null) return books;
   return books.where((b) => shelf.bookIds.contains(b.id)).toList();

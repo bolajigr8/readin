@@ -1,0 +1,12 @@
+{
+  "name": "readin-reader-harness",
+  "private": true,
+  "description": "Browser tests for assets/reader/reader.html (roadmap S0.5). Uses the Microsoft Edge (or Chrome) already installed on the PC — no browser download.",
+  "type": "module",
+  "scripts": {
+    "test": "node harness.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "1.56.1"
+  }
+}

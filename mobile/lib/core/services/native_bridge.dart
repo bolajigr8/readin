@@ -51,6 +51,32 @@ class NativeFiles {
     }
   }
 
+  /// "All files access" (needed to scan the phone for documents).
+  static Future<bool> hasAllFilesAccess() async {
+    try {
+      return (await _method.invokeMethod<bool>('hasAllFilesAccess')) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Opens the system screen where the user allows access to all files.
+  static Future<void> requestAllFilesAccess() async {
+    try {
+      await _method.invokeMethod<void>('requestAllFilesAccess');
+    } catch (_) {}
+  }
+
+  /// Every supported document on the phone: `{path, name, size, modified}`.
+  /// Throws `PlatformException('NO_ACCESS')` without the permission.
+  static Future<List<Map<String, dynamic>>> scanDevice() async {
+    final r = await _method.invokeMethod<List<dynamic>>('scanDevice');
+    return (r ?? const [])
+        .whereType<Map>()
+        .map((m) => Map<String, dynamic>.from(m))
+        .toList();
+  }
+
   /// "Open with…" — false when no installed app can open the file.
   static Future<bool> openWith(String path, String mime) async {
     try {

@@ -16,7 +16,7 @@ import {
   formatNaira,
   normalizePlansInput,
 } from '../services/billing.logic.js'
-import { paystackConfigured, paystackMode, publicBaseUrl } from '../services/paystack.service.js'
+import { paystackConfigured, paystackMode, publicBaseUrl, explainPaystackFailure, pingPaystack } from '../services/paystack.service.js'
 import { errorResponse, successResponse } from '../utils/response.utils.js'
 import {
   FEATURE_KEYS,
@@ -516,3 +516,15 @@ export const listPayments = asyncHandler(async (req: Request, res: Response) => 
     'OK',
   )
 })
+
+/** POST /admin/billing/test — checks the Paystack key and the connection from THIS server. */
+export const testPaystack = async (_req: Request, res: Response): Promise<void> => {
+  const r = await pingPaystack()
+  successResponse(res, {
+    ok: r.ok,
+    status: r.status,
+    mode: paystackMode(),
+    message: r.ok ? 'Connected. Paystack accepted the key.' : explainPaystackFailure(r),
+    detail: r.ok ? '' : `HTTP ${r.status} — ${r.message}`,
+  })
+}

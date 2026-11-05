@@ -1,3 +1,4 @@
+import '../../billing/limit_dialog.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,7 +12,6 @@ import '../../../core/services/routes.dart';
 import '../../../theme/app_typography.dart';
 import '../../../widgets/app_toast.dart';
 import '../../../widgets/buttons.dart';
-import '../../../widgets/confirm_dialog.dart';
 import '../../../widgets/pressable_opacity.dart';
 import '../../library/data/local_import_service.dart';
 import '../../library/providers/import_controller.dart';
@@ -77,15 +77,14 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
     }
 
     if (limit.isNotEmpty) {
-      final upgrade = await showConfirmDialog(
+      final upgrade = await showLimitDialog(
         context,
+        ref,
         title: 'Library Limit Reached',
-        message: limit.first.message ?? 'Free plan is limited to 10 books.',
-        confirmLabel: 'Upgrade',
-        cancelLabel: 'Not now',
+        message: limit.first.message ?? 'Your library is full.',
       );
       if (upgrade && mounted) {
-        router.go(AppRoutes.upgrade);
+        router.push(AppRoutes.upgrade);
         return;
       }
     }

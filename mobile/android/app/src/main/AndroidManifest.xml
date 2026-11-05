@@ -5,6 +5,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <!-- "On this phone": find documents anywhere on the device -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
     <queries>
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE"/>
@@ -123,6 +127,16 @@
                 <data android:mimeType="application/octet-stream"/>
             </intent-filter>
         </activity>
+
+        <!-- Reading-habit reminders (and re-arming them after a reboot) -->
+        <receiver
+            android:name=".HabitReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+            </intent-filter>
+        </receiver>
 
         <service
             android:name=".ReadAloudService"

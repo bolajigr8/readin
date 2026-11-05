@@ -110,8 +110,8 @@ class ReaderPalette {
     fg: Color(0xFFB4B4B4),
   );
   static const sepia = ReaderPalette(
-    bg: Color(0xFFF5E6C8),
-    fg: Color(0xFF3D2B1F),
+    bg: Color(0xFFF0DEC6),
+    fg: Color(0xFF121212),
   );
 
   static ReaderPalette byName(String name) => switch (name) {

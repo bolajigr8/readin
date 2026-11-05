@@ -1,10 +1,12 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:readin_flutter/constants/ionicons.dart';
 
 import '../../../constants/app_colors.dart';
 import '../../../theme/app_typography.dart';
 import '../../../utils/book_visuals.dart';
+import '../providers/library_providers.dart';
 
 /// RN `CoverFallback`: colour@14.5% fill, 1 px colour@25% border, 60 % × 60 %
 /// glow (colour@19%) in the middle, bold initials and (optionally) a faint
@@ -21,7 +23,11 @@ class CoverFallback extends StatelessWidget {
     this.showGlow = true,
     this.fillAlpha = 0x25,
     this.initials,
+    this.badge,
   });
+
+  /// Small label at the bottom ("DOCX", "XLSX"…) for books without a cover image.
+  final String? badge;
 
   final String title;
   final double? width;
@@ -84,6 +90,25 @@ class CoverFallback extends StatelessWidget {
               ],
             ],
           ),
+          if (badge != null)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 6,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.black.withValues(alpha: 0.45),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    badge!,
+                    style: AppTypography.label(size: 10, weight: FontWeight.w700, color: AppColors.white),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -92,7 +117,7 @@ class CoverFallback extends StatelessWidget {
 
 /// Network cover (`cover` fit, rounded) with the fallback when there is no
 /// URL or the image fails to load.
-class BookCover extends StatelessWidget {
+class BookCover extends ConsumerWidget {
   const BookCover({
     super.key,
     required this.title,
@@ -105,7 +130,13 @@ class BookCover extends StatelessWidget {
     this.showGlow = true,
     this.fillAlpha = 0x25,
     this.initials,
+    this.bookId,
+    this.badge,
   });
+
+  /// When set, a cover image stored on the phone (from the EPUB) is used first.
+  final String? bookId;
+  final String? badge;
 
   final String title;
   final String coverUrl;
@@ -119,7 +150,7 @@ class BookCover extends StatelessWidget {
   final String? initials;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     Widget fallback() => CoverFallback(
           title: title,
           width: width,
@@ -130,7 +161,26 @@ class BookCover extends StatelessWidget {
           showGlow: showGlow,
           fillAlpha: fillAlpha,
           initials: initials,
+          badge: badge,
         );
+
+    final id = bookId;
+    if (id != null) {
+      final file = ref.watch(bookCoverProvider(id)).valueOrNull;
+      if (file != null) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(radius),
+          child: Image.file(
+            file,
+            width: width ?? double.infinity,
+            height: height,
+            fit: BoxFit.cover,
+            cacheWidth: 420, // decode a small bitmap, not the 2 MB original
+            errorBuilder: (_, _, _) => fallback(),
+          ),
+        );
+      }
+    }
 
     if (coverUrl.isEmpty) return fallback();
 

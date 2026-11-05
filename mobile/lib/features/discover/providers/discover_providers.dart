@@ -4,11 +4,46 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/api_result.dart';
 import '../../../core/errors/app_exception.dart';
+import '../../../core/services/storage_service.dart';
+import '../../auth/providers/auth_providers.dart';
 import '../data/gutenberg_models.dart';
 import '../data/gutendex_datasource.dart';
 
-final gutendexDataSourceProvider =
-    Provider<GutendexDataSource>((ref) => GutendexDataSource());
+/// Keeps the last good first page of up to 10 lists in the phone's preferences.
+class PrefsGutendexCache implements GutendexCache {
+  PrefsGutendexCache(this._storage);
+
+  final StorageService _storage;
+  static const _indexKey = '@readin/gutendex_idx';
+  static const _max = 10;
+
+  String _k(String key) => '@readin/gutendex_$key';
+
+  @override
+  String? read(String key) {
+    final v = _storage.readString(_k(key));
+    return (v == null || v.isEmpty) ? null : v;
+  }
+
+  @override
+  Future<void> write(String key, String value) async {
+    final idx = (_storage.readString(_indexKey) ?? '')
+        .split('\n')
+        .where((e) => e.isNotEmpty)
+        .toList();
+    idx.remove(key);
+    idx.add(key);
+    while (idx.length > _max) {
+      await _storage.writeString(_k(idx.removeAt(0)), '');
+    }
+    await _storage.writeString(_k(key), value);
+    await _storage.writeString(_indexKey, idx.join('\n'));
+  }
+}
+
+final gutendexDataSourceProvider = Provider<GutendexDataSource>(
+  (ref) => GutendexDataSource(cache: PrefsGutendexCache(ref.read(storageServiceProvider))),
+);
 
 // ── Paged feed ───────────────────────────────────────────────────────────────
 
@@ -40,7 +75,11 @@ class DiscoverFeedState {
     this.isFetchingNext = false,
     this.error,
     this.nextError,
+    this.fromCache = false,
   });
+
+  /// The list is the last saved copy (Gutenberg could not be reached).
+  final bool fromCache;
 
   final List<GutenbergBook> books;
 
@@ -74,6 +113,7 @@ class DiscoverFeedState {
     bool clearError = false,
     AppException? nextError,
     bool clearNextError = false,
+    bool? fromCache,
   }) =>
       DiscoverFeedState(
         books: books ?? this.books,
@@ -83,6 +123,7 @@ class DiscoverFeedState {
         isFetchingNext: isFetchingNext ?? this.isFetchingNext,
         error: clearError ? null : (error ?? this.error),
         nextError: clearNextError ? null : (nextError ?? this.nextError),
+        fromCache: fromCache ?? this.fromCache,
       );
 }
 
@@ -110,6 +151,7 @@ class DiscoverFeedNotifier extends StateNotifier<DiscoverFeedState> {
         count: p.count,
         nextPage: p.hasNext ? 2 : null,
         isLoading: false,
+        fromCache: p.fromCache,
       ),
       failure: (e) =>
           state = DiscoverFeedState(isLoading: false, error: e),

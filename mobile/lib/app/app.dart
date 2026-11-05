@@ -1,3 +1,5 @@
+import '../features/billing/billing_providers.dart';
+import 'access_refresh.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -12,7 +14,12 @@ import '../core/services/native_bridge.dart';
 import '../core/services/router.dart';
 import '../core/services/routes.dart';
 import '../features/auth/providers/auth_providers.dart';
+import '../core/formats.dart';
+import '../features/features/features_provider.dart';
+import '../features/habits/habit_providers.dart';
 import '../features/library/data/local_import_service.dart';
+import '../features/shelves/shelf_providers.dart';
+import '../features/library/providers/library_providers.dart';
 import '../features/library/providers/import_controller.dart';
 import '../features/library/utils/open_book.dart';
 import '../providers/theme_provider.dart';
@@ -34,6 +41,16 @@ class _ReadInAppState extends ConsumerState<ReadInApp> with WidgetsBindingObserv
   final List<String> _queue = [];
   bool _draining = false;
   DateTime? _lastWake;
+  bool _autoOpened = false;
+
+  // Feature access / plan / payment switch: re-read often so an admin change shows up
+  // within about a minute (it used to wait up to 8 minutes, or a sign-out).
+  // Timing rules (45 s while open, on resume, max once per 15 s) live in
+  // AccessRefreshScheduler so they can be tested.
+  late final AccessRefreshScheduler _access = AccessRefreshScheduler(
+    isAllowed: () => ref.read(authProvider).isAuthenticated,
+    onRefresh: _refreshAccess,
+  );
 
   @override
   void initState() {
@@ -44,18 +61,35 @@ class _ReadInAppState extends ConsumerState<ReadInApp> with WidgetsBindingObserv
       _wakeServer();
       _onIncoming(await NativeFiles.takeIncoming()); // cold start via Share
     });
+    _access.start();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _incomingSub?.cancel();
+    _access.stop();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _wakeServer();
+    _access.setForeground(state == AppLifecycleState.resumed);
+    if (state == AppLifecycleState.resumed) {
+      _wakeServer();
+      _access.request(); // right away when the app comes back (at most every 15 s)
+    }
+  }
+
+  /// Light refresh: the user's plan, feature access and the payment switch.
+  /// (The heavier shelves / habits pull stays in [_refreshRemote].)
+  /// Called by [_access] (signed-in check and 15 s throttle happen there).
+  void _refreshAccess() {
+    unawaited(() async {
+      await ref.read(publicConfigProvider.notifier).refresh();
+      await ref.read(refreshUserProvider)();
+      await ref.read(featuresProvider.notifier).refresh();
+    }());
   }
 
   /// A free Render server sleeps after 15 min without traffic. One tiny GET when
@@ -69,6 +103,44 @@ class _ReadInAppState extends ConsumerState<ReadInApp> with WidgetsBindingObserv
     unawaited(
       ref.read(apiClientProvider).get<void>(ApiEndpoints.health, parser: (_) {}).then<void>((_) {}),
     );
+    unawaited(ref.read(publicConfigProvider.notifier).refresh());
+    _refreshRemote();
+  }
+
+  /// Cold start: continue the book you were reading (once per launch).
+  void _tryAutoOpen() {
+    if (_autoOpened || !mounted) return;
+    if (!ref.read(authProvider).isAuthenticated) return;
+    if (!ref.read(storageServiceProvider).openLastBook || _queue.isNotEmpty || _draining) {
+      _autoOpened = true; // disabled, or the app was opened to import a shared file
+      return;
+    }
+    final lib = ref.read(libraryProvider);
+    if (!lib.hasValue) return; // called again when the library arrives
+    _autoOpened = true;
+    final book = ref
+        .read(continueReadingProvider)
+        .where((b) => b.kind == ViewerKind.epub || b.kind == ViewerKind.pdf)
+        .firstOrNull;
+    if (book == null) return;
+    Future<void>.delayed(const Duration(milliseconds: 600), () {
+      if (mounted) openBookWith(ref.read(routerProvider), book);
+    });
+  }
+
+  /// Entitlements (trial / premium), habits and shelves from the server.
+  /// Offline or asleep → silently keeps the local copy.
+  void _refreshRemote() {
+    if (!ref.read(authProvider).isAuthenticated) return;
+    unawaited(() async {
+      await ref.read(refreshUserProvider)(); // plan + Premium end date from the server
+      await ref.read(featuresProvider.notifier).refresh();
+      if (!mounted) return;
+      await ref.read(shelvesProvider.notifier).pull();
+      if (ref.read(habitsAccessProvider).allowed) {
+        await ref.read(habitsProvider.notifier).pull();
+      }
+    }());
   }
 
   void _onIncoming(List<String> paths) {
@@ -114,7 +186,29 @@ class _ReadInAppState extends ConsumerState<ReadInApp> with WidgetsBindingObserv
 
     // Files that arrived before the user was signed in are imported afterwards.
     ref.listen(authProvider.select((s) => s.isAuthenticated), (prev, next) {
-      if (next) unawaited(_drain());
+      if (next) {
+        unawaited(_drain());
+        _tryAutoOpen();
+        _refreshRemote();
+      }
+    });
+    // A DIFFERENT account on this phone must start clean (no data mixing).
+    // Signing out and back in as the same person keeps everything (an expired
+    // session must never throw away edits that were not uploaded yet).
+    ref.listen(authProvider.select((s) => s.user?.id), (prev, next) {
+      if (next == null) return;
+      final storage = ref.read(storageServiceProvider);
+      final last = storage.readString('@readin/last_user_id');
+      if (last != null && last.isNotEmpty && last != next) {
+        ref.read(featuresProvider.notifier).clear();
+        ref.read(habitsProvider.notifier).clearLocal();
+        ref.read(shelvesProvider.notifier).clearLocal();
+      }
+      unawaited(storage.writeString('@readin/last_user_id', next));
+    });
+    // The library (cached) is ready → continue the last book.
+    ref.listen(libraryProvider, (prev, next) {
+      if (next.hasValue) _tryAutoOpen();
     });
 
     return MaterialApp.router(

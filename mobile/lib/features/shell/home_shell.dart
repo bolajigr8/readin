@@ -1,3 +1,4 @@
+import '../../core/services/routes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -14,7 +15,16 @@ class HomeShell extends ConsumerWidget {
 
   final StatefulNavigationShell navigationShell;
 
-  void _goTab(int index) {
+  void _goTab(BuildContext context, int index) {
+    // Drawer extras (not tabs): 4 = Habits, 5 = Notes & Highlights.
+    if (index == 4) {
+      context.push(AppRoutes.habits);
+      return;
+    }
+    if (index == 5) {
+      context.push(AppRoutes.notes);
+      return;
+    }
     navigationShell.goBranch(
       index,
       // Tapping the active tab again returns to that tab's first screen.
@@ -38,7 +48,7 @@ class HomeShell extends ConsumerWidget {
             body: navigationShell,
             bottomNavigationBar: AppTabBar(
               currentIndex: navigationShell.currentIndex,
-              onTap: _goTab,
+              onTap: (i) => _goTab(context, i),
             ),
           ),
           // Mini player floats above the tab bar, below the drawer.
@@ -48,7 +58,7 @@ class HomeShell extends ConsumerWidget {
           Positioned.fill(
             child: AppDrawer(
               activeIndex: navigationShell.currentIndex,
-              onNavigate: _goTab,
+              onNavigate: (i) => _goTab(context, i),
             ),
           ),
         ],

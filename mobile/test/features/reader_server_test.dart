@@ -97,6 +97,35 @@ void main() {
     }
   });
 
+  test('serves the bundled fonts (woff2) — and only well-formed font paths', () async {
+    server = await ReaderServer.start(
+      bookFile: book,
+      config: {},
+      loadAsset: assets,
+      loadBytes: (name) async => name == 'fonts/lora-latin-400-normal.woff2' ? [1, 2, 3, 4, 5] : throw Exception('missing'),
+    );
+    final ok = server!.pageUrl.replace(path: '/${server!.token}/fonts/lora-latin-400-normal.woff2');
+    final (status, body, headers) = await _request(ok);
+    expect(status, 200);
+    expect(body, [1, 2, 3, 4, 5]);
+    expect(headers.contentType?.mimeType, 'font/woff2');
+    expect(headers.value('cache-control'), contains('max-age'));
+
+    for (final bad in [
+      '/${server!.token}/fonts/sub/lora-latin-400-normal.woff2', // extra folder
+      '/${server!.token}/fonts/Lora.woff2', // capital letters
+      '/${server!.token}/fonts/lora.ttf', // wrong type
+      '/${server!.token}/other/lora-latin-400-normal.woff2',
+      '/wrongtoken/fonts/lora-latin-400-normal.woff2',
+    ]) {
+      final (s, _, _) = await _request(server!.pageUrl.replace(path: bad));
+      expect(s, 404, reason: bad);
+    }
+    // a font that is not bundled → error, never a crash
+    final (miss, _, _) = await _request(server!.pageUrl.replace(path: '/${server!.token}/fonts/nope-latin-400-normal.woff2'));
+    expect(miss, 500);
+  });
+
   test('wrong token, wrong method and unknown paths are 404', () async {
     server = await ReaderServer.start(bookFile: book, config: {}, loadAsset: assets);
     final base = server!.pageUrl;

@@ -7,6 +7,9 @@ import '../../auth/providers/auth_providers.dart';
 import '../data/datasources/library_remote_datasource.dart';
 import '../data/models/book.dart';
 import '../data/repositories/library_repository.dart';
+import 'dart:io' show File;
+
+import '../data/book_meta_store.dart';
 import '../data/local_import_service.dart';
 import '../data/local_library_store.dart';
 import '../utils/library_logic.dart';
@@ -21,12 +24,24 @@ final libraryRepositoryProvider = Provider<LibraryRepository>(
 
 final localLibraryStoreProvider = Provider<LocalLibraryStore>((ref) => LocalLibraryStore());
 
+/// Local details (summary, language, edits) and cover images of books.
+final bookMetaStoreProvider = Provider<BookMetaStore>((ref) => BookMetaStore());
+
+final bookMetaProvider = FutureProvider.autoDispose.family<BookMeta?, String>(
+  (ref, bookId) => ref.watch(bookMetaStoreProvider).read(bookId),
+);
+
+final bookCoverProvider = FutureProvider.autoDispose.family<File?, String>(
+  (ref, bookId) => ref.watch(bookMetaStoreProvider).coverFile(bookId),
+);
+
 final localImportServiceProvider = Provider<LocalImportService>(
   (ref) => LocalImportService(
     downloads: ref.watch(downloadServiceProvider),
     store: ref.watch(localLibraryStoreProvider),
     repo: ref.watch(libraryRepositoryProvider),
     userId: () => ref.read(authProvider).user?.id,
+    meta: ref.watch(bookMetaStoreProvider),
   ),
 );
 
@@ -167,6 +182,7 @@ final deleteBookProvider = Provider<Future<ApiResult<void>> Function(Book)>(
       final uid = ref.read(authProvider).user?.id;
       if (uid != null) await ref.read(localLibraryStoreProvider).removePending(uid, book.id);
       await ref.read(downloadServiceProvider).delete(book.id);
+      await ref.read(bookMetaStoreProvider).delete(book.id);
       ref.invalidate(bookDownloadProvider(book.id));
       ref.invalidate(libraryProvider);
       return const Success<void>(null);
@@ -174,6 +190,7 @@ final deleteBookProvider = Provider<Future<ApiResult<void>> Function(Book)>(
     final res = await ref.read(libraryRepositoryProvider).deleteBook(book.id);
     if (res.isSuccess) {
       await ref.read(downloadServiceProvider).delete(book.id);
+      await ref.read(bookMetaStoreProvider).delete(book.id);
       ref.invalidate(bookDownloadProvider(book.id));
       ref.invalidate(libraryProvider);
     }

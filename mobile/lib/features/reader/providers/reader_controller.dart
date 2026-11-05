@@ -11,6 +11,7 @@ import '../../library/data/repositories/library_repository.dart';
 import '../../library/data/services/download_service.dart';
 import '../../library/providers/download_providers.dart';
 import '../../goals/reading_goal.dart';
+import '../../habits/habit_providers.dart';
 import '../../library/providers/library_providers.dart';
 import '../data/dictionary_service.dart';
 import '../data/progress_repository.dart';
@@ -22,7 +23,10 @@ import '../../../core/services/storage_service.dart';
 /// path), so the controller (family) is created once per book even if the
 /// `extra` instances differ.
 class ReaderArgs {
-  const ReaderArgs({required this.bookId, this.book, this.local});
+  const ReaderArgs({required this.bookId, this.book, this.local, this.listen = false});
+
+  /// Opened with the 🔊 button: start reading aloud as soon as the book is shown.
+  final bool listen;
 
   final String bookId;
   final Book? book;
@@ -64,6 +68,8 @@ class ReaderState {
     this.pdfPage = 1,
     this.pdfPages = 0,
     this.locationsReady = false,
+    this.page = 0,
+    this.pages = 0,
     this.minutesLeft,
     this.searchQuery = '',
     this.searchResults = const [],
@@ -109,6 +115,10 @@ class ReaderState {
   /// epub.js finished generating locations (enables the scrubber).
   final bool locationsReady;
 
+  /// "100 of 259" — position among the book's measured pages (0 = unknown yet).
+  final int page;
+  final int pages;
+
   /// Estimated minutes left in the book from this session's pace (null = unknown).
   final int? minutesLeft;
   final String searchQuery;
@@ -144,6 +154,8 @@ class ReaderState {
     int? pdfPage,
     int? pdfPages,
     bool? locationsReady,
+    int? page,
+    int? pages,
     int? minutesLeft,
     bool clearMinutesLeft = false,
     String? searchQuery,
@@ -176,6 +188,8 @@ class ReaderState {
       pdfPage: pdfPage ?? this.pdfPage,
       pdfPages: pdfPages ?? this.pdfPages,
       locationsReady: locationsReady ?? this.locationsReady,
+      page: page ?? this.page,
+      pages: pages ?? this.pages,
       minutesLeft: clearMinutesLeft ? null : (minutesLeft ?? this.minutesLeft),
       searchQuery: searchQuery ?? this.searchQuery,
       searchResults: searchResults ?? this.searchResults,
@@ -193,12 +207,14 @@ class ReaderController extends StateNotifier<ReaderState> {
     required StorageService storage,
     required void Function() onClosed,
     void Function(int seconds)? onTimeCounted,
+    void Function(int pages)? onPagesRead,
   })  : _downloads = downloads,
         _progress = progress,
         _library = library,
         _storage = storage,
         _onClosed = onClosed,
         _onTimeCounted = onTimeCounted,
+        _onPagesRead = onPagesRead,
         super(
           ReaderState(
             prefs: ReaderPrefs(
@@ -213,6 +229,9 @@ class ReaderController extends StateNotifier<ReaderState> {
               volumeKeys: storage.volumeKeysNav,
               warmth: storage.readerWarmth,
               autoNight: storage.readerAutoNight,
+              hyphenate: storage.readerHyphenate,
+              pageAnim: storage.readerPageAnim,
+              fontWeight: storage.readerFontWeight,
             ),
             isLocal: args.local != null,
           ),
@@ -231,6 +250,18 @@ class ReaderController extends StateNotifier<ReaderState> {
   final StorageService _storage;
   final void Function() _onClosed;
   final void Function(int seconds)? _onTimeCounted;
+  final void Function(int pages)? _onPagesRead;
+
+  /// Last page number seen, to count FORWARD page turns for the habit tracker
+  /// (jumps larger than a few pages — seeking, searching — are not "reading").
+  int _lastCountedPage = 0;
+
+  void _countPage(int page) {
+    if (page <= 0) return;
+    final delta = page - _lastCountedPage;
+    if (_lastCountedPage > 0 && delta >= 1 && delta <= 6) _onPagesRead?.call(delta);
+    _lastCountedPage = page;
+  }
   late final ProgressSync _sync;
 
   /// Active reading time of this session (paused while in the background).
@@ -469,6 +500,8 @@ class ReaderController extends StateNotifier<ReaderState> {
     required int spineIndex,
     required String chapterTitle,
     required String href,
+    int page = 0,
+    int pages = 0,
   }) {
     if (!mounted || cfi.isEmpty) return;
     final toc = state.toc;
@@ -484,7 +517,10 @@ class ReaderController extends StateNotifier<ReaderState> {
       chapterIndex: chapter,
       chapterTitle: chapterTitle,
       minutesLeft: _estimateMinutesLeft(pct),
+      page: page > 0 ? page : null,
+      pages: pages > 0 ? pages : null,
     );
+    _countPage(page);
 
     if (_syncs) {
       _sync.update(
@@ -507,6 +543,7 @@ class ReaderController extends StateNotifier<ReaderState> {
 
   void onPdfPage(int page, int pages) {
     if (!mounted || page < 1) return;
+    _countPage(page);
     final pct = pages > 0 ? ((page / pages) * 100).round().clamp(0, 100) : 0;
     state = state.copyWith(
       pdfPage: page,
@@ -559,7 +596,8 @@ class ReaderController extends StateNotifier<ReaderState> {
   }
 
   void setFontFamily(String family) {
-    final f = family == 'serif' ? 'serif' : 'sans-serif';
+    // Every bundled font is valid (this used to turn everything but 'serif' into sans-serif).
+    final f = isReaderFont(family) ? family : 'merriweather';
     state = state.copyWith(prefs: state.prefs.copyWith(fontFamily: f));
     unawaited(_storage.setReaderFontFamily(f));
   }
@@ -571,7 +609,7 @@ class ReaderController extends StateNotifier<ReaderState> {
   }
 
   void setLineHeight(double v) {
-    final x = v.clamp(1.2, 2.2).toDouble();
+    final x = v.clamp(1.0, 2.6).toDouble();
     state = state.copyWith(prefs: state.prefs.copyWith(lineHeight: x));
     unawaited(_storage.setReaderLineHeight(x));
   }
@@ -604,6 +642,23 @@ class ReaderController extends StateNotifier<ReaderState> {
     final x = v.clamp(0.0, 0.5).toDouble();
     state = state.copyWith(prefs: state.prefs.copyWith(warmth: x));
     unawaited(_storage.setReaderWarmth(x));
+  }
+
+  void setPageAnim(String v) {
+    final a = v == 'none' ? 'none' : 'slide';
+    state = state.copyWith(prefs: state.prefs.copyWith(pageAnim: a));
+    unawaited(_storage.setReaderPageAnim(a));
+  }
+
+  void setHyphenate(bool v) {
+    state = state.copyWith(prefs: state.prefs.copyWith(hyphenate: v));
+    unawaited(_storage.setReaderHyphenate(v));
+  }
+
+  void setFontWeight(int v) {
+    final w = kFontWeights.contains(v) ? v : 700;
+    state = state.copyWith(prefs: state.prefs.copyWith(fontWeight: w));
+    unawaited(_storage.setReaderFontWeight(w));
   }
 
   void setAutoNight(bool v) {
@@ -660,8 +715,16 @@ final readerControllerProvider = StateNotifierProvider.autoDispose
       // Library bars / Continue Reading pick up the new progress.
       container.invalidate(libraryProvider);
     },
-    onTimeCounted: (seconds) =>
-        container.read(readingGoalProvider.notifier).add(seconds),
+    onTimeCounted: (seconds) {
+      container.read(readingGoalProvider.notifier).add(seconds);
+      container.read(habitsProvider.notifier).addSecondsRead(
+            args.local == null ? args.bookId : null,
+            seconds,
+          );
+    },
+    onPagesRead: (pages) => container
+        .read(habitsProvider.notifier)
+        .addPagesRead(args.local == null ? args.bookId : null, pages),
   );
 });
 

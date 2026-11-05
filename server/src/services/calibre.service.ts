@@ -28,6 +28,7 @@ export class CalibreService {
       const error = err as { stderr?: string; message?: string }
       throw new Error(
         `Calibre EPUB conversion failed: ${error.stderr ?? error.message ?? 'Unknown error'}`,
+        { cause: err },
       )
     }
   }
@@ -52,6 +53,7 @@ export class CalibreService {
       const error = err as { stderr?: string; message?: string }
       throw new Error(
         `Calibre HTML conversion failed: ${error.stderr ?? error.message ?? 'Unknown error'}`,
+        { cause: err },
       )
     }
   }

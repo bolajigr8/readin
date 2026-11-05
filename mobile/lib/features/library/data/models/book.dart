@@ -1,3 +1,5 @@
+import '../../../../core/formats.dart';
+
 /// Reading progress joined onto a book by `GET /library`.
 class BookProgress {
   const BookProgress({
@@ -17,8 +19,6 @@ class BookProgress {
         isCompleted: json['isCompleted'] == true,
       );
 }
-
-import '../../../../core/formats.dart';
 
 /// A book in the user's library (API_CONTRACT `Book`). Parsing is tolerant:
 /// missing strings become `''`, missing numbers `0`, missing dates the epoch.

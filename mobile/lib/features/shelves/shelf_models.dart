@@ -39,6 +39,7 @@ class ShelfData {
     this.finishedAt = const {},
     this.shelves = const [],
     this.yearlyGoal = 12,
+    this.favorites = const {},
   });
 
   final Map<String, ReadStatus> status;
@@ -46,17 +47,22 @@ class ShelfData {
   final List<Shelf> shelves;
   final int yearlyGoal;
 
+  /// Starred books (the ★ on a book card).
+  final Set<String> favorites;
+
   ShelfData copyWith({
     Map<String, ReadStatus>? status,
     Map<String, DateTime>? finishedAt,
     List<Shelf>? shelves,
     int? yearlyGoal,
+    Set<String>? favorites,
   }) =>
       ShelfData(
         status: status ?? this.status,
         finishedAt: finishedAt ?? this.finishedAt,
         shelves: shelves ?? this.shelves,
         yearlyGoal: yearlyGoal ?? this.yearlyGoal,
+        favorites: favorites ?? this.favorites,
       );
 
   String encode() => jsonEncode({
@@ -64,6 +70,7 @@ class ShelfData {
         'finishedAt': {for (final e in finishedAt.entries) e.key: e.value.toIso8601String()},
         'shelves': shelves.map((s) => s.toJson()).toList(),
         'yearlyGoal': yearlyGoal,
+        'favorites': favorites.toList(),
       });
 
   static ShelfData decode(String? raw) {
@@ -84,11 +91,32 @@ class ShelfData {
             Shelf.fromJson(Map<String, dynamic>.from(s as Map)),
         ],
         yearlyGoal: (j['yearlyGoal'] as num?)?.toInt() ?? 12,
+        favorites: {for (final f in (j['favorites'] as List? ?? const [])) '$f'},
       );
     } catch (_) {
       return const ShelfData();
     }
   }
+}
+
+/// Union of two copies (cloud sync never drops a status, shelf or favourite).
+ShelfData mergeShelfData(ShelfData local, ShelfData server) {
+  final shelves = [...local.shelves];
+  for (final s in server.shelves) {
+    final i = shelves.indexWhere((x) => x.id == s.id);
+    if (i < 0) {
+      shelves.add(s);
+    } else {
+      shelves[i] = shelves[i].copyWith(bookIds: {...shelves[i].bookIds, ...s.bookIds});
+    }
+  }
+  return ShelfData(
+    status: {...server.status, ...local.status},
+    finishedAt: {...server.finishedAt, ...local.finishedAt},
+    shelves: shelves,
+    yearlyGoal: local.yearlyGoal,
+    favorites: {...server.favorites, ...local.favorites},
+  );
 }
 
 /// The status shown for [b]: the user's explicit choice, otherwise derived from
