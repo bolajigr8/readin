@@ -9,8 +9,8 @@ and `fix/redis-upstash` (Redis TLS + log fixes). Latest log: `sessions/2026-11-0
 
 ## Half-done / in progress
 - Paystack (APK) paused: Paystack's firewall blocks Render (support contacted 2026-11-06). Play will use Google Play Billing (DECISIONS #16).
-- Redis (Upstash): new URL set but Render log still showed ECONNRESET → fix on `fix/redis-upstash` (forces TLS, logs
-  `[redis] connecting to rediss://<host>:6379 (TLS)` + a warning if the URL is wrong). After merge+deploy: read that log line.
+- Redis (Upstash): WORKING since 2026-11-06 (fix/redis-upstash merged; live RateLimit-Remaining counts down). `fix/redis-startup-race`
+  removes the false "Redis unavailable" line at boot — waiting for merge.
 
 ## Next 3 steps
 1. ✅ S7.1 built — Michael: merge `feat/s7-account-deletion` + deploy Render; try Profile → Delete account with a TEST account.
@@ -20,7 +20,6 @@ Order agreed 2026-11-06: Group A (S7.1, S3, S7.4, S7.2) → upload + closed test
 S2 update prompt, S4 biometrics, S6 Firebase, S5 roles, S9, Paystack phone-side fix) → Group C (S7.3 play-audit, S10 QA) → production.
 
 ## REMIND MICHAEL (open tasks — mention the relevant ones at each step)
-- Redis: new Upstash DB in US-West (Oregon); Render `UPSTASH_REDIS_URL=rediss://default:<pw>@<host>:6379` (double s).
 - (done 2026-11-06: S8 merged, Paystack message sent.) Merge `feat/s3-landing-site` (contains S7.1 too) + deploy Render.
 - S1.6 phone test of `mobile/build/release/1.0.0+1/readin-1.0.0-arm64-v8a.apk` (uninstall old build first).
 - Collect 12+ testers' Gmail addresses. Optional upload key (`readin-upload.jks`, alias upload) + key.properties lines.
