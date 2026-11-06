@@ -5,6 +5,7 @@ import 'package:readin_flutter/constants/ionicons.dart';
 
 import '../../constants/app_colors.dart';
 import '../../core/services/routes.dart';
+import '../billing/billing_providers.dart';
 import '../../theme/app_typography.dart';
 import '../../widgets/app_toast.dart';
 import '../../widgets/pressable_opacity.dart';
@@ -175,15 +176,17 @@ class _TrialIntro extends StatelessWidget {
 }
 
 /// Trial over (or feature unavailable).
-class _Paywall extends StatelessWidget {
+class _Paywall extends ConsumerWidget {
   const _Paywall({required this.access, required this.onBack});
 
   final FeatureAccess access;
   final VoidCallback onBack;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final off = access.state == AccessState.disabled;
+    // No buying screens in the Google Play version (or when the admin switched payments off).
+    final canBuy = ref.watch(billingVisibleProvider);
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -215,11 +218,13 @@ class _Paywall extends StatelessWidget {
                       Text(
                         off
                             ? 'This feature is switched off for now. Please check back later.'
-                            : 'The Reading Habit Tracker is part of ReadIn Premium. Your habits, streaks and history are safely saved and come back the moment you upgrade.',
+                            : canBuy
+                                ? 'The Reading Habit Tracker is part of ReadIn Premium. Your habits, streaks and history are safely saved and come back the moment you upgrade.'
+                                : 'The Reading Habit Tracker is part of ReadIn Premium. Your habits, streaks and history are safely saved and come back when Premium is active on your account.',
                         textAlign: TextAlign.center,
                         style: AppTypography.label(size: 14, color: AppColors.textSecondary, lineHeight: 21),
                       ),
-                      if (!off) ...[
+                      if (!off && canBuy) ...[
                         const SizedBox(height: 24),
                         PressableOpacity(
                           pressedOpacity: 0.85,
@@ -259,9 +264,10 @@ class TrialBanner extends ConsumerWidget {
     if (a.state != AccessState.trial || days == null) return const SizedBox.shrink();
     final urgent = days <= 3;
     final color = urgent ? AppColors.error400 : AppColors.amber400;
+    final canBuy = ref.watch(billingVisibleProvider);
     return PressableOpacity(
       pressedOpacity: 0.85,
-      onTap: () => context.push(AppRoutes.upgrade),
+      onTap: canBuy ? () => context.push(AppRoutes.upgrade) : null,
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
@@ -277,12 +283,14 @@ class TrialBanner extends ConsumerWidget {
             Expanded(
               child: Text(
                 days == 1
-                    ? 'Last day of your free trial! Get Premium to keep your habits going.'
+                    ? (canBuy
+                        ? 'Last day of your free trial! Get Premium to keep your habits going.'
+                        : 'Last day of your free trial. After today the tracker is part of Premium.')
                     : '$days days left of your free trial. After that the tracker is part of Premium.',
                 style: AppTypography.label(size: 13, color: AppColors.textPrimary, lineHeight: 18),
               ),
             ),
-            Icon(Ionicons.chevron_forward, size: 16, color: color),
+            if (canBuy) Icon(Ionicons.chevron_forward, size: 16, color: color),
           ],
         ),
       ),

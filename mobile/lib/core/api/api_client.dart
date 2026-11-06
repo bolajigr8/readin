@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 
+import '../distribution.dart';
 import '../errors/app_exception.dart';
 import '../services/token_service.dart';
 import 'api_endpoints.dart';
@@ -28,9 +29,11 @@ class ApiClient {
         connectTimeout: const Duration(seconds: 30),
         receiveTimeout: const Duration(seconds: 30),
         sendTimeout: const Duration(seconds: 30),
-        headers: const {
+        headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          // Which version is calling (APK vs Google Play) — the server refuses Paystack from Play.
+          'X-App-Distribution': kDistribution.wireName,
         },
       ),
     );

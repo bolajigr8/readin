@@ -40,3 +40,11 @@
     with privacy/terms/delete-account, S7.4 listing + forms) → closed test → remaining stages (S2, S4, S5, S6, S9) shipped as
     updates to testers → `/play-audit` → production. Michael wants **every feature + the landing page ready before the public launch**.
     Testers only need a Google account to join the Play test; Google sign-in inside ReadIn is NOT required (stays off).
+16. **Payments by distribution (2026-11-06, Michael)**: Play version = **Google Play Billing** (main system; most users come
+    from the Play link) with **two plans: monthly and yearly auto-renewing subscriptions**; connected through **RevenueCat**
+    (free < ~$2.5k/month; server code exists) → server `premiumUntil`. APK/website = Paystack (kept; firewall fix "start payment
+    from the phone" done before launch — paused now). Premium belongs to the ACCOUNT, whatever paid it. The app tells the server
+    its distribution (`X-App-Distribution`); the server refuses Paystack checkout from the Play version.
+17. **S8 approved (2026-11-06)**: flavors `direct` (APK: Paystack, whole-phone scan with MANAGE_EXTERNAL_STORAGE) and `play`
+    (AAB: no Paystack, no all-files permission — "Choose a folder"/share/open-with stay). Same applicationId. Whole-phone scan in
+    Play may be requested later via the Permissions Declaration (document management) once the app is approved — not for launch.

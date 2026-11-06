@@ -11,6 +11,7 @@ import '../features/feature_models.dart';
 import '../features/features_provider.dart';
 import 'habit_models.dart';
 import 'habit_providers.dart';
+import '../billing/billing_providers.dart';
 import 'habits_screen.dart' show habitColor;
 
 /// Home card: today's habits with progress (tap → Habits screen).
@@ -77,7 +78,9 @@ class HabitsHomeCard extends ConsumerWidget {
             const SizedBox(height: 8),
             if (locked)
               Text(
-                'Your free trial is over. Get Premium to keep tracking — your habits are saved.',
+                ref.watch(billingVisibleProvider)
+                    ? 'Your free trial is over. Get Premium to keep tracking — your habits are saved.'
+                    : 'Your free trial is over. The tracker is part of Premium — your habits are saved.',
                 style: AppTypography.label(size: 13, color: AppColors.textSecondary, lineHeight: 19),
               )
             else if (access.state == AccessState.trialAvailable)

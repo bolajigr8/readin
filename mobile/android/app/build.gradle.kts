@@ -33,6 +33,15 @@ val releaseSigningProblem: String? = when {
         "the keystore named in android/key.properties (storeFile) was not found."
     else -> null
 }
+// Optional UPLOAD key for the Google Play bundle (Play App Signing re-signs with the release key).
+// key.properties: uploadStoreFile / uploadStorePassword / uploadKeyAlias / uploadKeyPassword.
+// Not set → the Play bundle is signed with the release key (Google accepts that too).
+val uploadKeys = listOf("uploadStoreFile", "uploadStorePassword", "uploadKeyAlias", "uploadKeyPassword")
+val uploadStoreFile = keystoreProperties.getProperty("uploadStoreFile")
+    ?.takeIf { it.isNotBlank() }
+    ?.let { file(it) }
+val hasUploadKey = uploadKeys.all { !keystoreProperties.getProperty(it).isNullOrBlank() } &&
+    uploadStoreFile != null && uploadStoreFile.exists()
 val allowDebugSigning =
     (findProperty("ALLOW_DEBUG_SIGNING")?.toString() == "true") ||
         (System.getenv("READIN_ALLOW_DEBUG_SIGNING") == "true")
@@ -48,7 +57,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
+        // NEVER change: same id for both flavors and for every future release.
         applicationId = "com.micbol.readin"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
@@ -67,17 +76,48 @@ android {
                 storePassword = keystoreProperties.getProperty("storePassword")
             }
         }
+        create("upload") {
+            if (hasUploadKey) {
+                keyAlias = keystoreProperties.getProperty("uploadKeyAlias")
+                keyPassword = keystoreProperties.getProperty("uploadKeyPassword")
+                storeFile = uploadStoreFile
+                storePassword = keystoreProperties.getProperty("uploadStorePassword")
+            }
+        }
     }
 
-    buildTypes {
-        release {
-            // Release keystore when configured. The debug key is used only when the
-            // build explicitly allows it; otherwise the check below stops the build.
+    // Two versions of ReadIn from one code base (DECISIONS #17). SAME applicationId on purpose:
+    // people can move from the APK to the Play version without uninstalling (books stay).
+    //   direct = APK from our website (Paystack, whole-phone scan, MANAGE_EXTERNAL_STORAGE in src/direct)
+    //   play   = Google Play (no Paystack, no all-files permission) — built as an AAB
+    // Dart reads the flavor via `appFlavor` (lib/core/distribution.dart).
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("direct") {
+            dimension = "distribution"
+            // Release builds: the ReadIn release key (debug key only with the explicit opt-out).
             signingConfig = if (releaseSigningProblem == null) {
                 signingConfigs.getByName("release")
             } else {
                 signingConfigs.getByName("debug")
             }
+        }
+        create("play") {
+            dimension = "distribution"
+            // Upload key if configured, else the release key (debug only with the explicit opt-out).
+            signingConfig = when {
+                hasUploadKey -> signingConfigs.getByName("upload")
+                releaseSigningProblem == null -> signingConfigs.getByName("release")
+                else -> signingConfigs.getByName("debug")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            // No signingConfig here on purpose: a build type's signingConfig overrides the
+            // flavor's. (Debug builds keep the debug key — the debug build type sets it.)
+            signingConfig = null
         }
     }
 }
@@ -92,7 +132,8 @@ if (releaseSigningProblem != null) {
                 "Never give it to users. ($problem)",
         )
     } else {
-        tasks.matching { it.name == "packageRelease" || it.name == "signReleaseBundle" }
+        val releasePackaging = Regex("^(package(Direct|Play)Release|sign(Direct|Play)ReleaseBundle)$")
+        tasks.matching { releasePackaging.matches(it.name) }
             .configureEach {
                 doFirst {
                     throw GradleException(

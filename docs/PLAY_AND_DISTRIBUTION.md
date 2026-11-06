@@ -29,12 +29,16 @@ manager; never only on this PC). 10 000 days ≈ 27 years (Play requires validit
 * Copy `project/mobile/android/key.properties.example` → `project/mobile/android/key.properties` (git-ignored) and fill in:
   `storeFile=C:/Users/MICBOL/readin-keys/readin-release.jks`, `storePassword=…`, `keyAlias=readin`, `keyPassword=…` (same password).
 * `android/app/build.gradle.kts`: a **release build fails** if `key.properties` is missing/incomplete or the `.jks` is not found
-  (message explains why). Local test only: `flutter build apk --release -P ALLOW_DEBUG_SIGNING=true` (or env
+  (message explains why). Local test only: `flutter build apk --flavor direct --release -P ALLOW_DEBUG_SIGNING=true` (or env
   `READIN_ALLOW_DEBUG_SIGNING=true`) — such an APK must never reach users. `tool/verify.sh --apk` uses that opt-out only when no key exists.
 * **Real releases:** `cd project/mobile && bash tool/build_release.sh` → runs the app checks, builds universal + per-ABI APKs,
   `apksigner verify --print-certs` each (refuses the debug key / mixed certificates), copies them to
   `build/release/<version>/readin-<version>-<abi>.apk` with a notes file (certificate SHA-256, sizes, file SHA-256).
 * Debug-key APKs already installed on test phones cannot be updated by release-signed APKs → **uninstall once** (local-only books on that phone are lost).
+* **Google Play bundle (S8):** `cd project/mobile && bash tool/build_play.sh` → `build/release/<version>/readin-<version>-play.aab`.
+  Signed with the **upload key** if `key.properties` has `uploadStoreFile`, `uploadStorePassword`, `uploadKeyAlias`, `uploadKeyPassword`
+  (create `~/readin-keys/readin-upload.jks` with the §2.1 command, alias `upload`), otherwise with the release key. The script refuses
+  the debug key and fails if the Play manifest contains `MANAGE_EXTERNAL_STORAGE`.
 * **ReadIn release key (created by Michael 2026-11-06, alias `readin`, RSA 2048, 10 000 days):**
   * SHA-256: `15:B3:69:E4:C5:89:10:FB:A4:8A:25:F4:E7:BE:6D:B9:49:70:39:E9:07:27:DB:7E:56:B4:30:29:C5:09:08:10`
     (apksigner form: `15b369e4c58910fba48a25f4e7be6db9497039e90727db7e56b43029c5090810`)

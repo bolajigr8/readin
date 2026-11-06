@@ -459,6 +459,24 @@ try {
     assert.equal(u.plan, 'free')
   })
 
+  await test('the Google Play version can never start a Paystack payment (X-App-Distribution: play)', async () => {
+    const before = tx.size
+    const r = await call('POST', '/payments/checkout', {
+      token: aliceToken,
+      body: { planId: await planId() },
+      headers: { 'x-app-distribution': 'play' },
+    })
+    assert.equal(r.status, 403, r.text)
+    assert.match(r.json.message, /not available in this version/i)
+    assert.equal(tx.size, before, 'Paystack must not be called')
+    const direct = await call('POST', '/payments/checkout', {
+      token: aliceToken,
+      body: { planId: await planId() },
+      headers: { 'x-app-distribution': 'direct' },
+    })
+    assert.equal(direct.status, 200, direct.text)
+  })
+
   await test('admin "Test connection": key OK and "start payment" gets through → ok, nothing created', async () => {
     const before = tx.size
     const r = await call('POST', '/admin/billing/test', { token: adminToken, body: {} })

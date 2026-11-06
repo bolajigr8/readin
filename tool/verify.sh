@@ -104,9 +104,9 @@ if want mobile; then
     # build would stop on purpose (S1), so we allow the debug key here explicitly.
     # Real releases: bash mobile/tool/build_release.sh (refuses the debug key).
     if [ -f "$ROOT/mobile/android/key.properties" ]; then
-      run "app: release APK" mobile flutter build apk --release --split-per-abi
+      run "app: release APK" mobile flutter build apk --flavor direct --release --split-per-abi
     else
-      run "app: release APK (debug key)" mobile flutter build apk --release --split-per-abi -P ALLOW_DEBUG_SIGNING=true
+      run "app: release APK (debug key)" mobile flutter build apk --flavor direct --release --split-per-abi -P ALLOW_DEBUG_SIGNING=true
       echo "NOTE: android/key.properties is missing — this APK is signed with the DEBUG key (do not give it to users)."
     fi
   fi
