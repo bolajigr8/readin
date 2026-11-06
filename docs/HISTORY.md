@@ -67,3 +67,9 @@ See `ROADMAP.md` — APK release + versioning + landing page, Firebase Analytics
 ### 2026-11-06 — S0 merged, Paystack confirmed
 * PR #1 (S0) merged by Michael; Render redeployed. Admin Billing → Test connection: **"Connected. Paystack accepted the key."** — the 403/firewall problem from §2 is resolved in production (S0.2 done). Full checkout not yet exercised live (S10).
 * Git workflow: branches `feat/ fix/ chore/ docs/ refactor/ test/` → PR → Michael merges (DECISIONS #13); direct pushes to `main` are rejected by GitHub (`commit_refs_rules`).
+
+### 2026-11-06 — S0 complete
+- Michael installed VS Build Tools 2026 "Desktop development with C++"; `flutter doctor` clean.
+- `flutter test`: 202/202 pass (first full run on this PC), incl. 8 new access-refresh tests (S0.6). S0.1–S0.7 all ticked.
+- Full counts: server unit 32, e2e 22, admin proxy 7, app 202, tap 4, viewer 9, reader harness 17.
+- Next: S1 release signing.
