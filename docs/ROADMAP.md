@@ -30,9 +30,9 @@ Order matters: S0 → S1 → S2 → S3 are needed to start acquiring users safel
 - [ ] S2.5 [M] Publish release 1.0.0 in admin once S1+S3 are live.
 
 ## S3 — Landing page (Vercel) — see LANDING_PAGE_PLAN.md
-- [ ] S3.1 [C] New `project/site/` (Next.js static/ISR, same toolchain as admin): download button, version/size/date/checksum from `GET /app/version`, release notes, install guide with Play-Protect / unknown-sources / Samsung Auto-Blocker steps, FAQ, QR code, links to `/privacy`, `/terms`, `/delete-account`.
-- [ ] S3.2 [C] Pages `/privacy`, `/terms`, `/delete-account` (drafts; flagged "to be reviewed by Michael/lawyer").
-- [ ] S3.3 [C] `render.yaml` buildFilters so API redeploys only for `server/**`; Vercel ignored-build-step docs for `admin` and `site`.
+- [x] S3.1 [C] (done 2026-11-06 as plain HTML for Cloudflare Pages — download buttons driven by `site/release.json` until S2's /app/version exists; `tool/site_check.mjs` 150 checks + `tool/site_browser.mjs` 11 tests) New `project/site/` (Next.js static/ISR, same toolchain as admin): download button, version/size/date/checksum from `GET /app/version`, release notes, install guide with Play-Protect / unknown-sources / Samsung Auto-Blocker steps, FAQ, QR code, links to `/privacy`, `/terms`, `/delete-account`.
+- [x] S3.2 [C] (done 2026-11-06: /privacy, /terms, /delete-account — DRAFTS for Michael's review) Pages `/privacy`, `/terms`, `/delete-account` (drafts; flagged "to be reviewed by Michael/lawyer").
+- [x] S3.3 [C] (done 2026-11-06: render.yaml buildFilter server/**; site needs no build) `render.yaml` buildFilters so API redeploys only for `server/**`; Vercel ignored-build-step docs for `admin` and `site`.
 - [ ] S3.4 [M] Create the Vercel project (Root Directory `site`), host the APK (GitHub Releases `readin-releases`), (optional) buy a domain.
 
 ## S4 — Biometric sign-in — see BIOMETRIC_PLAN.md ⚠ (touches MainActivity + auth flow)

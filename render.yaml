@@ -7,6 +7,11 @@ services:
     plan: free
     healthCheckPath: /api/v1/health
     autoDeploy: true
+    # Rebuild only when the server changes — not for app, admin, website or docs commits (S3.3).
+    # (Only used if the service is managed by this Blueprint / auto-deploy is on.)
+    buildFilter:
+      paths:
+        - server/**
     envVars:
       - key: NODE_ENV
         value: production

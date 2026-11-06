@@ -1,5 +1,29 @@
 # APK landing page (`project/site`, deployed on Vercel as a SEPARATE project from the admin)
 
+> **Changed 2026-11-06:** built as plain HTML on **Cloudflare Pages** (not Next.js on Vercel) — no build, no packages,
+> commercial use allowed (DECISIONS #18). The original plan below is kept for reference.
+
+## Built 2026-11-06 (S3.1/S3.2) — what exists now
+
+Plain HTML + one CSS file + one small script. **No build step, no packages.** Hosted on **Cloudflare Pages**
+(free, commercial use allowed — DECISIONS #18). Pages: `/` (home, install guide, FAQ), `/privacy`, `/terms`,
+`/delete-account` (explains in-app deletion; the web flow itself runs on the API server:
+https://readin-ehzw.onrender.com/delete-account). Cloudflare serves `privacy.html` at `/privacy` automatically.
+
+* **New release:** edit `release.json` only (`playUrl`, `apk.url`, `version`, `date`, `sizeMb`, `sha256`) — the home page
+  buttons switch from "coming soon" to real download links. No code change.
+* **Check before every deploy:** `node tool/site_check.mjs` (links, required texts, no external resources) and
+  `node tool/site_browser.mjs` (opens every page in Edge/Chrome at phone width: no errors, no sideways scrolling).
+* `_headers` = security headers (Cloudflare Pages). `404.html` = not-found page.
+* Legal texts are drafts written by Claude Code — Michael reviews them (a lawyer if possible) before launch.
+  Keep `/privacy` in step with the Play Console Data safety answers and with what the app really does.
+
+## Deploy (Michael, once)
+Cloudflare dashboard → Workers & Pages → Create → Pages → **Connect to Git** → repo `bolajigr8/readin` → production branch
+`main` → Framework preset **None** → Build command **(empty)** → Build output directory **`site`** → Save and Deploy.
+Then Custom domains → `readin.micbol.org` → add the CNAME record it shows at **Spaceship** (DNS for micbol.org).
+
+
 ## Goals
 A fast public page where people download the latest ReadIn APK safely, understand how to install it, and find privacy/terms/account-deletion links (these URLs are also needed for Google Play later).
 

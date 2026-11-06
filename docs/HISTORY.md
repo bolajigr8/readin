@@ -97,3 +97,7 @@ See `ROADMAP.md` — APK release + versioning + landing page, Firebase Analytics
 - App: Profile → Delete account (password + type DELETE) → server deletes → phone wiped (tokens, settings, books, reminders) → app restarts fresh.
 - Web: /delete-account → e-mail link (1 h, hashed) → confirm page → delete. URL for Play Console: https://readin-ehzw.onrender.com/delete-account.
 - Kept: payment records without e-mail; audit line without e-mail. Tests: server e2e 29, app 217.
+
+### 2026-11-06 — S3 website (branch `feat/s3-landing-site`)
+- `project/site`: plain HTML for Cloudflare Pages at readin.micbol.org — home, install guide, FAQ, privacy, terms, delete-account.
+- Download buttons from `site/release.json`. Checks: `tool/site_check.mjs` (150), `tool/site_browser.mjs` (11, Edge). render.yaml buildFilter.

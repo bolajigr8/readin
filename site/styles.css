@@ -1,0 +1,98 @@
+/* ReadIn website — one small stylesheet, no external fonts or scripts (fast on mobile data). */
+:root {
+  --brand: #f97316;
+  --brand-d: #ea6c0a;
+  --bg: #fffaf5;
+  --card: #ffffff;
+  --ink: #18181b;
+  --muted: #52525b;
+  --soft: #71717a;
+  --line: #ececf0;
+  --ok: #16a34a;
+  --warn-bg: #fff7ed;
+  --radius: 16px;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0a0a0a;
+    --card: #141414;
+    --ink: #f4f4f5;
+    --muted: #c4c4cc;
+    --soft: #9a9aa4;
+    --line: #26262b;
+    --warn-bg: #1f150c;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+a { color: var(--brand); }
+a:hover { color: var(--brand-d); }
+img { max-width: 100%; height: auto; }
+.wrap { max-width: 980px; margin: 0 auto; padding: 0 20px; }
+.narrow { max-width: 760px; }
+
+/* header */
+.top { border-bottom: 1px solid var(--line); background: var(--card); }
+.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 64px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font-weight: 800; font-size: 20px; }
+.brand img { width: 36px; height: 36px; border-radius: 9px; }
+.nav { display: flex; gap: 16px; flex-wrap: wrap; font-size: 15px; }
+.nav a { color: var(--muted); text-decoration: none; }
+.nav a:hover { color: var(--brand); }
+
+/* hero */
+.hero { padding: 56px 0 40px; text-align: center; }
+.hero img.logo { width: 112px; height: 112px; border-radius: 26px; box-shadow: 0 10px 30px rgba(249, 115, 22, .25); }
+.hero h1 { font-size: clamp(30px, 6vw, 46px); line-height: 1.15; margin: 22px 0 12px; }
+.hero p.lead { font-size: 18px; color: var(--muted); max-width: 620px; margin: 0 auto 26px; }
+.cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 14px 22px; border-radius: 12px; font-weight: 700; font-size: 16px; text-decoration: none;
+  border: 2px solid var(--brand); min-width: 230px;
+}
+.btn.primary { background: var(--brand); color: #fff; }
+.btn.primary:hover { background: var(--brand-d); border-color: var(--brand-d); color: #fff; }
+.btn.ghost { color: var(--brand); background: transparent; }
+.btn[aria-disabled="true"] { opacity: .55; pointer-events: none; }
+.note { font-size: 14px; color: var(--soft); margin-top: 12px; }
+
+/* sections */
+section { padding: 34px 0; }
+h2 { font-size: 26px; margin: 0 0 16px; }
+h3 { font-size: 18px; margin: 0 0 6px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
+.card p { margin: 0; color: var(--muted); font-size: 15px; }
+.emoji { font-size: 28px; line-height: 1; margin-bottom: 10px; }
+ol.steps { padding-left: 22px; margin: 0; }
+ol.steps li { margin-bottom: 10px; color: var(--muted); }
+ol.steps li strong { color: var(--ink); }
+details { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
+summary { cursor: pointer; font-weight: 700; }
+details p { color: var(--muted); margin: 10px 0 0; }
+.callout { background: var(--warn-bg); border: 1px solid var(--line); border-left: 4px solid var(--brand); border-radius: 12px; padding: 14px 16px; color: var(--muted); }
+code, .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 14px; word-break: break-all; }
+
+/* legal pages */
+.doc { padding-top: 36px; padding-bottom: 20px; } /* keep .wrap side padding */
+.doc h1 { font-size: 32px; margin: 0 0 6px; }
+.doc .updated { color: var(--soft); font-size: 14px; margin: 0 0 24px; }
+.doc h2 { font-size: 21px; margin: 30px 0 10px; }
+.doc p, .doc li { color: var(--muted); }
+.doc table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 15px; }
+.doc th, .doc td { text-align: left; vertical-align: top; padding: 10px 8px; border-bottom: 1px solid var(--line); color: var(--muted); }
+.doc th { color: var(--ink); }
+.table-scroll { overflow-x: auto; }
+
+/* footer */
+footer { border-top: 1px solid var(--line); margin-top: 30px; padding: 26px 0 40px; color: var(--soft); font-size: 14px; }
+footer .links { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 10px; }
+footer a { color: var(--muted); }

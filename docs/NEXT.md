@@ -13,7 +13,7 @@ page. Latest log: `sessions/2026-11-06-s7-account-deletion.md`.
 
 ## Next 3 steps
 1. ✅ S7.1 built — Michael: merge `feat/s7-account-deletion` + deploy Render; try Profile → Delete account with a TEST account.
-2. Claude: S3 landing page `project/site` (privacy, terms, delete-account) + render buildFilter; then S7.4 store texts/forms.
+2. ✅ S3 site built (branch `feat/s3-landing-site`, includes S7.1) — Michael: merge + Cloudflare Pages + Spaceship DNS (steps in LANDING_PAGE_PLAN). Claude next: S7.4 store texts/forms, S7.2 permission review.
 3. Michael: then create the Play Console app → "use my own key" (Claude gives PEPK steps) → closed test, 12+ testers, 14 days.
 Order agreed 2026-11-06: Group A (S7.1, S3, S7.4, S7.2) → upload + closed test → Group B during the test (Play Billing monthly+yearly,
 S2 update prompt, S4 biometrics, S6 Firebase, S5 roles, S9, Paystack phone-side fix) → Group C (S7.3 play-audit, S10 QA) → production.
