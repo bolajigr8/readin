@@ -176,7 +176,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
           return true;
         },
         failure: (e) {
-          debugPrint('[Google Auth] backend rejected sign-in: ${e.message}');
+          if (kDebugMode) {
+            debugPrint('[Google Auth] backend rejected sign-in: ${e.message}');
+          }
           state = const AuthState(
             status: AuthStatus.error,
             error: UnknownException(message: _googleFailedCopy),
@@ -188,7 +190,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } catch (e) {
       // Typical causes: wrong SHA-1 / package (ApiException 10), missing
       // serverClientId, no Play services. Real cause is in the debug log.
-      debugPrint('[Google Auth] sign-in failed: $e');
+      if (kDebugMode) debugPrint('[Google Auth] sign-in failed: $e');
       if (!mounted) return false;
       state = const AuthState(
         status: AuthStatus.error,

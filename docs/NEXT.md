@@ -1,29 +1,36 @@
 # NEXT — where we are right now (Claude Code keeps this current)
 
-**Updated:** 2026-11-06   **Current stage:** S0 — DONE (all 7 items). Next: S1 (release signing).
-Latest log: `sessions/2026-11-06-vs-tools.md`.
+**Updated:** 2026-11-06   **Current stage:** S1 — code done (S1.2–S1.5) on branch `feat/s1-release-signing`;
+waiting for Michael: S1.1 (create the release key) and S1.6 (real phones). Latest log: `sessions/2026-11-06-s1-signing.md`.
 
 ## Done
-- Onboarding (2026-11-05): real layout (app = `project/mobile`), docs fixed, snapshot commit `160094b`.
-- S0 (2026-11-05/06): merged to main (PR #1, PR #2). Server lint 0 errors; audit_dart fixed; `.gitignore` hardened;
-  Expo files removed (tag `expo-legacy`, pushed 2026-11-06); husky hook; `tool/verify.sh`; server e2e 22/22; reader harness 17/17;
-  AccessRefreshScheduler; `mobile/ios/` template restored.
-- S0.2 (2026-11-06): Paystack Test connection → "Connected. Paystack accepted the key."
-- S0.1/S0.6 (2026-11-06): VS Build Tools 2026 C++ installed, `flutter doctor` all ✓, **`flutter test` 202/202 pass**
-  (incl. the 8 new access-refresh tests).
+- S0 complete (merged): all checks green, `flutter test` 202/202.
+- S1.2–S1.5 (2026-11-06): release build fails without the key; `tool/build_release.sh`; `tool/bump_version.dart`;
+  backup OFF; release logging debug-only. Tested with a throwaway key (deleted).
 
 ## Half-done / in progress
-- Small docs commits on branch `chore/s0-baseline` (S0.2 + S0.1/S0.6 notes) → need one more pull request merge.
-- Release APK not rebuilt since the `app.dart` change (optional: `bash tool/verify.sh --apk`, ~20 min; still debug-signed).
+- Pull request for `feat/s1-release-signing` waiting for Michael's merge.
+- Michael to delete leftover test files (git-ignored): `mobile/build/release/` and `mobile/build/app/outputs/flutter-apk/app-*release.apk*`.
 
 ## Next 3 steps
-1. Michael: merge the `chore/s0-baseline` pull request; delete old branch `claude/s0-baseline` on GitHub.
-2. Claude: `git switch main && git pull`.
-3. `/stage S1` (release signing — Michael creates the keystore with the command Claude Code gives; needs approval).
+1. Michael: merge the S1 pull request; Claude: `git switch main && git pull`.
+2. Michael (S1.1): create the key with PLAY_AND_DISTRIBUTION.md §2.1, 2 offline backups, fill `mobile/android/key.properties`
+   → `cd project/mobile && bash tool/build_release.sh` → send Claude the SHA-256/SHA-1 lines (not passwords) to record.
+3. S1.6: uninstall old debug builds on test phones, install the new APK, then later install the next build over it. Then `/stage S2`.
+
+## NEW 2026-11-06: Michael has a Google Play Console account → Play is the main goal (APK stays)
+Verified requirements: PLAY_AND_DISTRIBUTION.md §7b. Order APPROVED by Michael (DECISIONS #15):
+1. S1.1 key (now urgent: needed for the AAB + "use my own key" in Play App Signing) → S1.6.
+2. "Play-ready minimum" before the closed test: S8.1/S8.2 (play flavor: no Paystack/prices, no MANAGE_EXTERNAL_STORAGE; AAB),
+   S7.1 account deletion (app + server), S3 site with /privacy, /terms, /delete-account, S7.4 store listing + Data safety +
+   content rating answers, reviewer account.
+3. Closed test: 12+ testers for 14 days in a row (personal account) — S2/S4/S6 continue during those 14 days.
+4. Apply for production.
 
 ## Open questions for Michael
-- None blocking.
+- None. Answers 2026-11-06: order OK; Play account is personal; Michael will find 12+ testers.
 
 ## Reminders
-- All APKs so far are DEBUG-signed. Phones with a debug build must uninstall once when S1 lands (local-only books lost) — warn testers.
+- Phones with an old debug build must uninstall once (local-only books on that phone are lost) — warn testers.
+- `flutter run --release` / `flutter build apk --release` now need the key, or `-P ALLOW_DEBUG_SIGNING=true` for tests.
 - To continue a conversation: `claude --continue` from the inner `Book-App` folder; or start `claude` and type `/resume`.

@@ -30,3 +30,13 @@
 11. **Husky pre-commit**: keep husky, rewrite the hook — server lint-staged + typecheck; admin `tsc` when admin files are staged; `flutter analyze` when mobile files are staged (S0.3).
 12. **iOS kept possible**: `mobile/ios/` restored from `a2ae276` (Flutter template, placeholder bundle id). Android stays first; an iPhone version is a future stage (Swift ports of the native features, Mac + Apple Developer account).
 13. **Git workflow (2026-11-06)**: Claude Code works on branches named by type — `feat/…`, `fix/…`, `chore/…`, `docs/…`, `refactor/…`, `test/…` (never `claude/…`, Michael's choice) — merges the latest `origin/main` into the branch and resolves all conflicts + re-runs checks BEFORE pushing, pushes only that branch; Michael opens/merges the pull request on GitHub (merge commit). Pushing to `main`, force-push and remote-branch deletion are blocked in `.claude/settings.json`. Reason: a direct push to `main` was rejected by GitHub (`fatal error in commit_refs_rules`) and Michael wants to review before anything reaches `main` (Render deploys from `main`).
+14. **Release signing & backup (S1, 2026-11-06)**: a release build without the release key **fails** (no silent debug-key
+    fallback); local opt-out `-P ALLOW_DEBUG_SIGNING=true` only for test builds. Real releases via `mobile/tool/build_release.sh`
+    (verifies the certificate). **Phone backup off**: `android:allowBackup="false"` + `data_extraction_rules.xml` excluding all
+    data from cloud backup and device-to-device transfer — login tokens are encrypted with a key that never leaves the phone,
+    so a restored copy would break sign-in (Michael approved). Versions via `mobile/tool/bump_version.dart`; versionCode +1 every build.
+15. **Play first (2026-11-06)**: Michael has a **personal** Play Console account → closed test with ≥12 testers × 14 days is
+    required. Order approved: S1.1 key → Play-ready minimum (S8 flavors + AAB, S7.1 account deletion, S3 landing page `project/site`
+    with privacy/terms/delete-account, S7.4 listing + forms) → closed test → remaining stages (S2, S4, S5, S6, S9) shipped as
+    updates to testers → `/play-audit` → production. Michael wants **every feature + the landing page ready before the public launch**.
+    Testers only need a Google account to join the Play test; Google sign-in inside ReadIn is NOT required (stays off).

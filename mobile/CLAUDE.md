@@ -13,7 +13,9 @@ node tool/test_tap_zones.js && node tool/test_viewer_core.js     # JS logic extr
 python tool/audit_dart.py .                                      # fast static checks (imports, symbols, icons)
 cd tool/reader_harness && pnpm install && pnpm test             # reader.html in the installed Edge/Chrome (17 tests)
 flutter run --release -d <deviceId>
-flutter build apk --release --split-per-abi     # → build/app/outputs/flutter-apk/
+flutter build apk --release --split-per-abi     # needs android/key.properties (or -P ALLOW_DEBUG_SIGNING=true for a test build)
+bash tool/build_release.sh                     # real release: checks + signed APKs + certificate check + notes
+dart run tool/bump_version.dart patch          # raise version (versionCode +1)
 bash tool/fix_android.sh           # only if Gradle says “project 'app' not found” (Android settings files lost)
 ```
 `API_BASE_URL` build-time override: `--dart-define=API_BASE_URL=https://…/api/v1` (default = production API).
@@ -36,7 +38,7 @@ bash tool/fix_android.sh           # only if Gradle says “project 'app' not fo
 * Access refresh timing (45 s / on resume / ≥15 s gap / signed in only) lives in `lib/app/access_refresh.dart` (`AccessRefreshScheduler`, tested in `test/features/access_refresh_test.dart`).
 * Android Gradle: git tracks `android/build.gradle.kts`, `android/app/build.gradle.kts`, `android/settings.gradle.kts`, `android/gradle.properties`, the wrapper properties and `android/app/src/**`; `local.properties`, `gradlew*`, `key.properties`, `*.jks`/`*.keystore` are git-ignored (`android/.gitignore`). Root `build.gradle.kts` forces `compileSdk=36` for plugin modules via reflection — leave it unless a plugin upgrade makes it unnecessary. Kotlin: `gradle.properties` has `android.builtInKotlin=false` and `settings.gradle.kts` declares the Kotlin Android plugin 2.4.0; AGP 9.1.0, Gradle 9.3.1.
 * No `proguard-rules.pro` yet; release builds use R8 — test WebView/TTS/native channels in a release APK on a real phone.
-* `android:allowBackup` is not set (defaults to on) — decision in S1.5.
-* Release signing: see `project/docs/PLAY_AND_DISTRIBUTION.md` §2 (currently **falls back to the debug key** if `android/key.properties` is absent, and it is absent — **S1 removes that**).
+* Backup is **off** (S1.5): `android:allowBackup="false"` + `res/xml/data_extraction_rules.xml` (no cloud backup, no device-to-device copy) because tokens in flutter_secure_storage cannot be decrypted on another phone.
+* Release signing (S1): `android/key.properties` (copy `key.properties.example`) → release keystore. Without it a **release build fails** on purpose; test-only opt-out `-P ALLOW_DEBUG_SIGNING=true`. Real releases: `bash tool/build_release.sh` (checks + universal/per-ABI APKs + `apksigner` certificate check + notes in `build/release/<version>/`). Versions: `dart run tool/bump_version.dart patch|minor|major|build`. See `project/docs/PLAY_AND_DISTRIBUTION.md` §2–3.
 * No new dependency without listing it in the stage plan (pub.dev package, why, size impact).
 * Planned work touching this app: S1 signing, S2 update prompt, S4 biometrics (MainActivity → FlutterFragmentActivity), S6 Firebase, S7 account deletion/permissions, S8 flavors (`direct`/`play`). See `project/docs/ROADMAP.md`.

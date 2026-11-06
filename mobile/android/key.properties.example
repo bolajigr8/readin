@@ -1,0 +1,7 @@
+# Copy this file to android/key.properties (git-ignored) and fill in your own values.
+# NEVER commit key.properties or the .jks file. Back up both offline (2 places).
+# Use forward slashes in storeFile, even on Windows.
+storeFile=C:/Users/MICBOL/readin-keys/readin-release.jks
+storePassword=CHANGE_ME
+keyAlias=readin
+keyPassword=CHANGE_ME

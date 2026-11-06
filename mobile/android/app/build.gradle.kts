@@ -7,11 +7,35 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// ── Release signing ────────────────────────────────────────────────────────
+// android/key.properties (git-ignored; copy key.properties.example) points at the
+// ReadIn release keystore. A release build WITHOUT it fails on purpose: an APK signed
+// with the debug key cannot be updated by the real one (users would have to uninstall
+// and lose their books). Local test only:
+//   flutter build apk --release -P ALLOW_DEBUG_SIGNING=true
+//   (or set the environment variable READIN_ALLOW_DEBUG_SIGNING=true)
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
-    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+    FileInputStream(keystorePropertiesFile).use { keystoreProperties.load(it) }
 }
+val signingKeys = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+val missingSigningKeys = signingKeys.filter { keystoreProperties.getProperty(it).isNullOrBlank() }
+val releaseStoreFile = keystoreProperties.getProperty("storeFile")
+    ?.takeIf { it.isNotBlank() }
+    ?.let { file(it) }
+val releaseSigningProblem: String? = when {
+    !keystorePropertiesFile.exists() ->
+        "android/key.properties is missing (copy android/key.properties.example and fill it in)."
+    missingSigningKeys.isNotEmpty() ->
+        "android/key.properties has no value for: ${missingSigningKeys.joinToString()}."
+    releaseStoreFile == null || !releaseStoreFile.exists() ->
+        "the keystore named in android/key.properties (storeFile) was not found."
+    else -> null
+}
+val allowDebugSigning =
+    (findProperty("ALLOW_DEBUG_SIGNING")?.toString() == "true") ||
+        (System.getenv("READIN_ALLOW_DEBUG_SIGNING") == "true")
 
 android {
     namespace = "com.micbol.readin"
@@ -36,25 +60,49 @@ android {
 
     signingConfigs {
         create("release") {
-            if (keystorePropertiesFile.exists()) {
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["keyPassword"] as String
-                storeFile = file(keystoreProperties["storeFile"] as String)
-                storePassword = keystoreProperties["storePassword"] as String
+            if (releaseSigningProblem == null) {
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storeFile = releaseStoreFile
+                storePassword = keystoreProperties.getProperty("storePassword")
             }
         }
     }
 
     buildTypes {
         release {
-            // android/key.properties present -> your release keystore;
-            // otherwise the debug key (so `flutter run --release` still works).
-            signingConfig = if (keystorePropertiesFile.exists()) {
+            // Release keystore when configured. The debug key is used only when the
+            // build explicitly allows it; otherwise the check below stops the build.
+            signingConfig = if (releaseSigningProblem == null) {
                 signingConfigs.getByName("release")
             } else {
                 signingConfigs.getByName("debug")
             }
         }
+    }
+}
+
+// Stop a release package/bundle that would be signed with the debug key.
+// (Configuration of debug builds, `flutter run`, tests and analyze is unaffected.)
+if (releaseSigningProblem != null) {
+    val problem = releaseSigningProblem
+    if (allowDebugSigning) {
+        logger.warn(
+            "ReadIn: ALLOW_DEBUG_SIGNING=true → this release build is signed with the DEBUG key. " +
+                "Never give it to users. ($problem)",
+        )
+    } else {
+        tasks.matching { it.name == "packageRelease" || it.name == "signReleaseBundle" }
+            .configureEach {
+                doFirst {
+                    throw GradleException(
+                        "ReadIn release signing is not set up: $problem\n" +
+                            "Release APKs must be signed with the ReadIn release key " +
+                            "(see project/docs/PLAY_AND_DISTRIBUTION.md §2).\n" +
+                            "For a local test build only, add: -P ALLOW_DEBUG_SIGNING=true",
+                    )
+                }
+            }
     }
 }
 

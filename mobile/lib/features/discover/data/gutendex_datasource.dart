@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io' show HandshakeException;
 
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 
 import '../../../core/api/api_result.dart';
 import '../../../core/errors/app_exception.dart';
@@ -93,8 +93,10 @@ class GutendexDataSource {
       try {
         return await _dio.get<dynamic>(path, queryParameters: query);
       } on DioException catch (e) {
-        debugPrint('[Gutendex] GET $path $query failed (attempt $attempt): '
-            '${e.type} status=${e.response?.statusCode} error=${e.error}');
+        if (kDebugMode) {
+          debugPrint('[Gutendex] GET $path $query failed (attempt $attempt): '
+              '${e.type} status=${e.response?.statusCode} error=${e.error}');
+        }
         if (attempt >= 3 || !_retryable(e)) rethrow;
         await Future<void>.delayed(retryDelay * attempt);
       }

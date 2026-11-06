@@ -10,22 +10,32 @@ imported books live on the phone, so an uninstall (forced by a certificate chang
 signing-key continuity as the top technical risk.
 
 ## 2. Signing
-### 2.1 Create the key (Michael, once — never commit it)
+### 2.1 Create the key (Michael, once — never commit it, never paste the passwords into a chat)
 ```bash
-# Windows Git Bash; keytool ships with Android Studio:  "C:/Program Files/Android/Android Studio/jbr/bin/keytool"
+# Git Bash. keytool ships with Android Studio:
+KT="/c/Program Files/Android/Android Studio/jbr/bin/keytool.exe"
 mkdir -p ~/readin-keys
-keytool -genkeypair -v -keystore ~/readin-keys/readin-release.jks -alias readin \
-  -keyalg RSA -keysize 2048 -validity 10000
-# fingerprints to record in this file (NOT the passwords):
-keytool -list -v -keystore ~/readin-keys/readin-release.jks -alias readin
+"$KT" -genkeypair -v -keystore ~/readin-keys/readin-release.jks -alias readin   -keyalg RSA -keysize 2048 -validity 10000
+#   It asks for a password (twice) and your name / organisation / city / country code (NG).
+#   The key password is the SAME as the store password (modern PKCS12 keystores) — keytool won't ask twice.
+# Fingerprints to record below (NOT the passwords):
+"$KT" -list -v -keystore ~/readin-keys/readin-release.jks -alias readin | grep -E "SHA1:|SHA256:"
 ```
-Back up the `.jks` and both passwords in two separate offline places. 10 000 days ≈ 27 years (Play requires validity well beyond 2033).
+Back up the `.jks` and the password in **two separate offline places** (e.g. a USB stick kept at home + a password
+manager; never only on this PC). 10 000 days ≈ 27 years (Play requires validity well beyond 2033).
+**Losing the key or the password = no more updates for everyone who installed ReadIn.**
 
-### 2.2 Wire it (Claude Code, S1)
-* `project/mobile/android/key.properties` (git-ignored by `project/mobile/android/.gitignore`):
-  `storePassword=… keyPassword=… keyAlias=readin storeFile=C:/Users/MICBOL/readin-keys/readin-release.jks`
-* `android/app/build.gradle.kts` already reads `key.properties` but **silently falls back to the debug key** → change so a *release* build **fails** without the key (allow an explicit opt-out property for local testing only). **Any APK given to real users must be signed with the release key.** Debug-key APKs already installed on test phones cannot be updated by release-signed APKs (uninstall once).
-* Record here after S1: `Release certificate SHA-256: ____`  `SHA-1: ____`  `First release date: ____`.
+### 2.2 Wire it (done in S1, 2026-11-06)
+* Copy `project/mobile/android/key.properties.example` → `project/mobile/android/key.properties` (git-ignored) and fill in:
+  `storeFile=C:/Users/MICBOL/readin-keys/readin-release.jks`, `storePassword=…`, `keyAlias=readin`, `keyPassword=…` (same password).
+* `android/app/build.gradle.kts`: a **release build fails** if `key.properties` is missing/incomplete or the `.jks` is not found
+  (message explains why). Local test only: `flutter build apk --release -P ALLOW_DEBUG_SIGNING=true` (or env
+  `READIN_ALLOW_DEBUG_SIGNING=true`) — such an APK must never reach users. `tool/verify.sh --apk` uses that opt-out only when no key exists.
+* **Real releases:** `cd project/mobile && bash tool/build_release.sh` → runs the app checks, builds universal + per-ABI APKs,
+  `apksigner verify --print-certs` each (refuses the debug key / mixed certificates), copies them to
+  `build/release/<version>/readin-<version>-<abi>.apk` with a notes file (certificate SHA-256, sizes, file SHA-256).
+* Debug-key APKs already installed on test phones cannot be updated by release-signed APKs → **uninstall once** (local-only books on that phone are lost).
+* Record here after S1.1: `Release certificate SHA-256: ____`  `SHA-1: ____`  `First release date: ____`.
 
 ### 2.3 Play App Signing (future, no surprises)
 * Plan: when creating the Play app choose **“Use existing key / upload your own app signing key”** and import `readin-release.jks` via Google's **PEPK** tool (download link and exact command are in Play Console → Setup → App signing; roughly `java -jar pepk.jar --keystore=… --alias=readin --output=output.zip --include-cert --rsa-aes-encryption --encryption-key-path=<Google's public key>`). Result: the Play-delivered app has the **same certificate** as the APK users already have → in-place updates from sideload to Play.
@@ -34,7 +44,11 @@ Back up the `.jks` and both passwords in two separate offline places. 10 000 day
 * If we ever must use a Google-generated app signing key instead, sideloaded users will have to uninstall/reinstall to move to the Play build (data loss for local-only imports) — avoid.
 
 ## 3. Versioning
-`pubspec.yaml version: 1.0.0+1` → versionName `1.0.0`, versionCode `1`. versionCode must always increase (Play and Android require it). Server keeps `minSupportedVersionCode`.
+`pubspec.yaml version: 1.0.0+1` → versionName `1.0.0`, versionCode `1`. versionCode must always increase (Play and Android
+require it; a phone refuses an "update" whose versionCode is not higher). Server keeps `minSupportedVersionCode` (S2).
+Use the helper (from `project/mobile`): `dart run tool/bump_version.dart patch|minor|major|build` (`show`, `--dry-run`).
+`patch` = fixes (1.0.0→1.0.1), `minor` = new features (→1.1.0), `major` = big change (→2.0.0), `build` = same version, new build.
+Every one of them raises versionCode by exactly 1. Bump on the release branch before `tool/build_release.sh`; never reuse a number.
 
 ## 4. APK hosting
 * **Not Google Drive** for the public link (virus-scan interstitials, quota “too many downloads” blocks, unstable direct links).
@@ -65,6 +79,27 @@ Back up the `.jks` and both passwords in two separate offline places. 10 000 day
 * `play` flavor, phase A = **consumption-only**: no prices, no upgrade buttons, no text/links that point to buying elsewhere; signed-in users with Premium see “Premium active until …”. Phase B = Play Billing via RevenueCat → server `premiumUntil`.
 * `direct` flavor keeps Paystack. Server stays authoritative; both flavors read the same entitlements.
 * Implement the split with `BillingPolicy` + `kDistribution` (S8.1). Also hide Paystack-specific copy (e-mails, landing page) from the Play listing.
+
+## 7b. Verified Google Play facts (researched 2026-11-06 — re-check before submitting)
+Michael has a **Google Play Console account** (2026-11-06) → Play publishing is now the main goal; the APK stays as a second channel.
+| Topic | Fact (source) | ReadIn status / action |
+|---|---|---|
+| Closed test (personal accounts created after 13 Nov 2023) | ≥ **12 testers opted in for the last 14 days continuously**, and they should really use the app; then apply for production (review usually ≤ 7 days). Organisation accounts (D-U-N-S) are exempt. | Critical path: start the closed test as early as possible. Testers need Google accounts. |
+| Target API | New apps + updates must target **API 36 (Android 16)** since 31 Aug 2026 (Play Console Help 11926878). | ✅ targetSdk 36, minSdk 24 (checked in the merged manifest). |
+| 16 KB memory pages | Required for apps targeting Android 15+. | ✅ all arm64 `.so` files are 16 KB-aligned (zipalign -P 16 + ELF check, 2026-11-06). |
+| Format | AAB upload, Play App Signing. | S8.2. **At the first upload choose "use my own key" (import `readin-release.jks` with PEPK)** so APK users can move to Play without uninstalling. Needs S1.1 first. |
+| Payments | Google Play Billing **is available in Nigeria** (merchant registration supported, users pay in naira) → digital Premium sold inside the Play app **must** use Play Billing. Alternative billing / external links programmes cover US, UK, EEA (+ India, South Korea) — **not Nigeria** (June 2026 blog). | Keep DECISIONS #2: Play build = no prices, no Paystack, no links to buy elsewhere (phase A); Play Billing later (S8.3). Paystack stays in the APK. Merchant payouts in USD to a domiciliary account. |
+| `MANAGE_EXTERNAL_STORAGE` | Only for approved core uses (e.g. document management) with a declaration; file picking / reading own library must use the Storage Access Framework. | Remove from the Play build (S8 flavors). The system file picker + share/open-with already cover imports. |
+| Foreground service | `mediaPlayback` type ✅ in manifest; Play Console → App content → Foreground service: choose Media playback + a short demo video (app reading aloud while minimised). | Michael records the video. |
+| Account deletion | Apps with sign-up must offer deletion **in the app AND on a web page** that works without the app; link in the Data safety form; say what is kept and why. | S7.1 (server + app) + site `/delete-account` (S3). |
+| Privacy policy | Required for every app; public web page (not a PDF), must match the Data safety answers. | Site `/privacy` (S3). |
+| Data safety form | Must be accurate (misrepresentation = removal). Covers e-mail, name, books/notes/progress, crash/analytics (if added), purchase history; processors; encryption in transit; deletion. | S7.4 draft answers; update when Firebase (S6) is added. |
+| App access for reviewers | Give a working login (no 2-step, no expiry) + instructions; the reviewer must reach every feature incl. Premium screens. | Create a verified reviewer account; give it Premium via admin gift. |
+| Other App content forms | Ads (none), content rating (IARC questionnaire), target audience (choose 13+ or 18+ — under-13 brings the Families policy), news/health/financial/government (no). | S7.4 answers. |
+| Developer verification (sideloading) | Play-verified developers: eligible Play apps are **registered automatically**; Play Console can also register apps distributed outside Play. Enforcement: Brazil, Indonesia, Singapore, Thailand from 30 Sep 2026; **global in 2027**. Unregistered apps still installable via ADB / "advanced flow". | Nigeria not enforced yet; once the app is on Play with the same key, check Play Console shows it registered (covers the APK too). |
+| User monitoring | No Google Tag Manager needed (GTM for apps only forwards Firebase events). **Play Console gives for free**: installs/uninstalls, countries, devices, ratings/reviews, **Android vitals** (crashes, ANRs, slow start), acquisition reports. Detailed in-app behaviour = Firebase Analytics + Crashlytics (S6, with consent). | Use Play Console now; S6 later. |
+Sources: Play Console Help (target API 11926878, account deletion 13327111, Data safety 10787469, All-files access 10467955,
+supported locations 9306917, payments 10281818), Android Developers Blog (2026-03 developer verification, 2026-06 billing choice).
 
 ## 8. Release process (target state)
 1. `/verify-all` → 2. bump version → 3. `tool/build_release.sh` (verify signature + print SHA-256) → 4. upload APK to the host → 5. add the release in admin → 6. test update-over-install on a real phone → 7. announce. Keep a table of releases below.
