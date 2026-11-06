@@ -9,7 +9,7 @@ waiting for Michael: S1.1 (create the release key) and S1.6 (real phones). Lates
   backup OFF; release logging debug-only. Tested with a throwaway key (deleted).
 
 ## Half-done / in progress
-- S1.1 key created (fingerprints recorded). First signed build failed: keyPassword in `mobile/android/key.properties` wrong → Michael fixes, then rerun `bash tool/build_release.sh`.
+- S1.1 DONE: first release-signed APKs 1.0.0+1 built 2026-11-06 (`mobile/build/release/1.0.0+1/`, cert SHA-256 15b369e4…0810 ✓). Next: S1.6 phone test by Michael.
 - Pull request for `feat/s1-release-signing` waiting for Michael's merge.
 - Michael to delete leftover test files (git-ignored): `mobile/build/release/` and `mobile/build/app/outputs/flutter-apk/app-*release.apk*`.
 
