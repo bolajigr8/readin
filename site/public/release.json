@@ -1,10 +1,10 @@
 {
   "playUrl": "",
   "apk": {
-    "url": "",
-    "version": "",
-    "date": "",
-    "sizeMb": 0,
-    "sha256": ""
+    "url": "https://github.com/bolajigr8/readin-releases/releases/download/v1.0.0/readin-1.0.0-universal.apk",
+    "version": "1.0.0",
+    "date": "7 November 2026",
+    "sizeMb": 85.5,
+    "sha256": "d1f7991a3578b7f071a3b437029c50df67b7598bec8a1a81b111cd60aee4e78e"
   }
 }
