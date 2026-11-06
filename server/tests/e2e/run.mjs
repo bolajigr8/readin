@@ -506,6 +506,8 @@ try {
     const n = (serverLog.match(/\[rate-limit\] Redis unavailable/g) ?? []).length
     assert.ok(n >= 1 && n <= 3, `expected 1-3 "[rate-limit] Redis unavailable" lines, got ${n}`)
     assert.ok(!serverLog.includes('express-rate-limit: error from store'), 'express-rate-limit still logs every store error')
+    assert.ok(!serverLog.includes('ERR_ERL_INVALID_HITS'), 'fail-open store returned 0 hits (express-rate-limit 8 rejects that)')
+    assert.ok(!serverLog.includes('Unhandled error event'), 'ioredis error events are not handled')
   })
 
   await test('payments switched off in admin → checkout refused, app told to hide payments', async () => {
