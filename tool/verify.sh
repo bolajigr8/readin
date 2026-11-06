@@ -100,8 +100,13 @@ if want mobile; then
     run "app: reader browser" mobile/tool/reader_harness node harness.mjs
   fi
   if [ $APK -eq 1 ]; then
-    run "app: release APK" mobile flutter build apk --release --split-per-abi
-    if [ ! -f "$ROOT/mobile/android/key.properties" ]; then
+    # This is only a "does it build" check. Without android/key.properties the release
+    # build would stop on purpose (S1), so we allow the debug key here explicitly.
+    # Real releases: bash mobile/tool/build_release.sh (refuses the debug key).
+    if [ -f "$ROOT/mobile/android/key.properties" ]; then
+      run "app: release APK" mobile flutter build apk --release --split-per-abi
+    else
+      run "app: release APK (debug key)" mobile flutter build apk --release --split-per-abi -P ALLOW_DEBUG_SIGNING=true
       echo "NOTE: android/key.properties is missing — this APK is signed with the DEBUG key (do not give it to users)."
     fi
   fi

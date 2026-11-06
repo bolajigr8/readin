@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+: no cloud backup and no device-to-device copy of app data.
+     Login tokens live in flutter_secure_storage, encrypted with a key that never
+     leaves this phone; a restored copy on another phone cannot be decrypted and
+     would break sign-in. (Decided in S1.5, DECISIONS #14.)
+     (Android 11 and older: android:allowBackup="false" in the manifest.) -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>

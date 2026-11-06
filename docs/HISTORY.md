@@ -73,3 +73,14 @@ See `ROADMAP.md` — APK release + versioning + landing page, Firebase Analytics
 - `flutter test`: 202/202 pass (first full run on this PC), incl. 8 new access-refresh tests (S0.6). S0.1–S0.7 all ticked.
 - Full counts: server unit 32, e2e 22, admin proxy 7, app 202, tap 4, viewer 9, reader harness 17.
 - Next: S1 release signing.
+
+### 2026-11-06 — S1 signing & release pipeline (branch `feat/s1-release-signing`)
+- Release builds now FAIL without `android/key.properties` + keystore (no silent debug key). Test-only opt-out
+  `-P ALLOW_DEBUG_SIGNING=true` / `READIN_ALLOW_DEBUG_SIGNING=true`; `verify.sh --apk` uses it only when no key exists.
+- New: `mobile/android/key.properties.example`, `mobile/tool/build_release.sh` (checks → universal + per-ABI → apksigner
+  certificate check, refuses debug/mixed certs → `build/release/<ver>/` + notes with SHA-256/SHA-1/sizes/checksums),
+  `mobile/tool/bump_version.dart` (versionCode +1 always), `res/xml/data_extraction_rules.xml`.
+- Backup OFF (`allowBackup=false` + extraction rules) — DECISIONS #14. 3 release `debugPrint`s made debug-only.
+- No new packages / env vars / server changes. Tests: app 202, tap 4, viewer 9; signing paths tested with a throwaway key.
+- Gotchas: Dart `\s*$` in multiLine regex eats line endings; apksigner 37 prints "V2 Signer: certificate … digest:".
+- Left: S1.1 keystore + S1.6 real phones (Michael).
