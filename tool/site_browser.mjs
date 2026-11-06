@@ -177,7 +177,7 @@ await test('unknown address shows the 404 page', async () => {
 })
 
 await test('no release yet → both buttons say "coming soon" and are not clickable', async () => {
-  releaseOverride = null
+  releaseOverride = { playUrl: '', apk: { url: '', version: '', date: '', sizeMb: 0, sha256: '' } }
   const v = await visit('/', 'light')
   try {
     for (const id of ['#play-btn', '#apk-btn']) {
@@ -185,6 +185,23 @@ await test('no release yet → both buttons say "coming soon" and are not clicka
       if ((await b.getAttribute('aria-disabled')) !== 'true') throw new Error(`${id} is clickable`)
       if (!/coming soon/i.test(await b.textContent())) throw new Error(`${id} text: ${await b.textContent()}`)
     }
+  } finally {
+    await v.ctx.close()
+  }
+})
+
+await test('the published release.json: APK button works, Play still "coming soon" until the Play link is added', async () => {
+  releaseOverride = null // the real file in out/
+  const rel = JSON.parse(readFileSync(path.join(site, 'release.json'), 'utf8'))
+  const v = await visit('/', 'light')
+  try {
+    const apk = v.page.locator('#apk-btn')
+    if (rel.apk.url) {
+      if (!/^https:\/\/github\.com\/bolajigr8\/readin-releases\/releases\/download\//.test(rel.apk.url)) throw new Error('APK URL is not a readin-releases download')
+      if (!/^[0-9a-f]{64}$/.test(rel.apk.sha256)) throw new Error('sha256 is not 64 hex characters')
+      if ((await apk.getAttribute('href')) !== rel.apk.url) throw new Error('APK link not set')
+    }
+    if (!rel.playUrl && (await v.page.locator('#play-btn').getAttribute('aria-disabled')) !== 'true') throw new Error('Play button clickable without a link')
   } finally {
     await v.ctx.close()
   }
