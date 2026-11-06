@@ -54,3 +54,8 @@
     Play Console — proposed (a) Play Console at launch with admin showing/toggling, (b) admin edits Google prices via the Play
     Developer API (service account) later. **Michael chose (a) at launch.** Landing page on **Cloudflare Pages** (free, commercial
     use allowed; Vercel Hobby is non-commercial). micbol.org DNS is managed at **Spaceship**.
+19. **Website = Next.js (2026-11-06, Michael)**: `project/site` rebuilt as a Next.js 16 app like the admin (static export,
+    Cloudflare Pages), with `motion` animations, both light and dark mode + a theme switch. New packages (site only): next
+    16.4.3, react/react-dom 19.3.0, motion, geist, lucide-react; dev: tailwindcss 4, @tailwindcss/turbopack, typescript,
+    eslint + eslint-config-next 16.4.3. Next 16.4.0 is flagged with a security vulnerability → the site uses 16.4.3; the
+    ADMIN still uses 16.4.0 → upgrade it on its own branch (ask Michael).

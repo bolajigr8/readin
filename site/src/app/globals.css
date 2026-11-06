@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+/* Dark mode = the `dark` class on <html>, set before the first paint by the inline script in
+   layout.tsx (saved choice, else the phone's setting). No flash, works without React. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Warm "paper and ink" palette + ReadIn orange. */
+:root {
+  --bg: #fffaf4;
+  --bg-2: #fff1e3;
+  --card: #ffffff;
+  --ink: #1d1510;
+  --muted: #6d5e53;
+  --soft: #9a8b7f;
+  --line: rgba(29, 21, 16, 0.09);
+  --brand: #f97316;
+  --brand-2: #fb923c;
+  --amber: #f59e0b;
+  --glow: rgba(249, 115, 22, 0.22);
+  --shadow: 0 24px 60px -24px rgba(120, 53, 15, 0.35);
+  color-scheme: light;
+}
+.dark {
+  --bg: #0b0806;
+  --bg-2: #140e0a;
+  --card: #17110d;
+  --ink: #f7ede3;
+  --muted: #bfae9f;
+  --soft: #8d7c6e;
+  --line: rgba(255, 238, 220, 0.09);
+  --brand: #fb8a3c;
+  --brand-2: #fdba74;
+  --amber: #fbbf24;
+  --glow: rgba(251, 138, 60, 0.18);
+  --shadow: 0 30px 70px -30px rgba(0, 0, 0, 0.8);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-2: var(--bg-2);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-soft: var(--soft);
+  --color-line: var(--line);
+  --color-brand: var(--brand);
+  --color-brand-2: var(--brand-2);
+  --color-amber: var(--amber);
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-serif: var(--font-fraunces), Georgia, "Times New Roman", serif;
+}
+
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  transition: background-color 0.4s ease, color 0.4s ease;
+}
+::selection { background: color-mix(in srgb, var(--brand) 30%, transparent); }
+
+/* Orange → amber text used for the accent words in headings. */
+.text-gradient {
+  background: linear-gradient(100deg, var(--brand) 10%, var(--amber) 90%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Soft glowing blobs behind the hero. */
+.blob { position: absolute; border-radius: 9999px; filter: blur(70px); opacity: 0.9; pointer-events: none; }
+
+/* Faint dotted "paper" texture, fading out. */
+.dots {
+  background-image: radial-gradient(var(--line) 1.2px, transparent 1.2px);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+}
+
+/* Endless row of file formats. */
+@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.marquee { animation: marquee 32s linear infinite; }
+
+/* Read-aloud sound bars. */
+@keyframes bar { 0%, 100% { transform: scaleY(0.35); } 50% { transform: scaleY(1); } }
+.sound-bar { transform-origin: bottom; animation: bar 1.1s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .marquee, .sound-bar { animation: none; }
+}
+
+/* Long-form legal pages (no typography plugin needed). */
+.prose-legal h2 { font-family: var(--font-serif); font-size: 1.45rem; font-weight: 600; margin: 2.2rem 0 0.7rem; color: var(--ink); }
+.prose-legal p, .prose-legal li { color: var(--muted); line-height: 1.75; }
+.prose-legal p { margin: 0.7rem 0; }
+.prose-legal ul, .prose-legal ol { margin: 0.6rem 0 0.6rem 1.3rem; }
+.prose-legal ul { list-style: disc; }
+.prose-legal ol { list-style: decimal; }
+.prose-legal li { margin: 0.35rem 0; }
+.prose-legal strong { color: var(--ink); }
+.prose-legal a { color: var(--brand); text-decoration: underline; text-underline-offset: 3px; }
+.prose-legal table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.95rem; }
+.prose-legal th, .prose-legal td { text-align: left; vertical-align: top; padding: 0.75rem 0.6rem; border-bottom: 1px solid var(--line); color: var(--muted); }
+.prose-legal th { color: var(--ink); font-weight: 600; }
