@@ -22,6 +22,9 @@ export interface IUser extends Document {
   emailVerificationExpires: Date | null
   passwordResetToken: string | null
   passwordResetExpires: Date | null
+  /** Web "delete my account" link (S7.1): SHA-256 of the token from the e-mail, and when it expires. */
+  accountDeletionTokenHash: string | null
+  accountDeletionExpires: Date | null
   expoPushToken: string | null
   refreshTokens: string[]
   createdAt: Date
@@ -101,6 +104,14 @@ const userSchema = new Schema<IUser>(
       type: Date,
       default: null,
     },
+    accountDeletionTokenHash: {
+      type: String,
+      default: null,
+    },
+    accountDeletionExpires: {
+      type: Date,
+      default: null,
+    },
     expoPushToken: {
       type: String,
       default: null,
@@ -118,5 +129,6 @@ const userSchema = new Schema<IUser>(
 // Index for faster token lookups
 userSchema.index({ emailVerificationToken: 1 })
 userSchema.index({ passwordResetToken: 1 })
+userSchema.index({ accountDeletionTokenHash: 1 }, { sparse: true })
 
 export const User = mongoose.model<IUser>('User', userSchema)

@@ -223,6 +223,74 @@ export const paymentResultPage = (p: PaymentPageInput): string => {
 
 // ── generic ────────────────────────────────────────────────────────────────────
 
+// ── delete my account (web; Google Play requires it outside the app) ─────────────
+
+const DELETED_LIST =
+  '<ul style="text-align:left;margin:12px 0 0 0;padding-left:20px;line-height:1.7">' +
+  '<li>your account, e-mail address, name and password</li>' +
+  '<li>your books stored in ReadIn&rsquo;s cloud</li>' +
+  '<li>notes, highlights, bookmarks and reading progress</li>' +
+  '<li>reading habits, settings and free trials</li></ul>' +
+  '<p class="small" style="margin-top:12px">Kept without your e-mail: payment records (amount, date, plan) &mdash; the law requires them for accounting. ' +
+  'Books saved only on your phone are removed when you delete the account in the app, or when you uninstall ReadIn.</p>'
+
+/** GET /delete-account — ask for the e-mail; we send a confirmation link. */
+export const deleteAccountRequestPage = (): string =>
+  renderPage({
+    title: 'Delete your ReadIn account',
+    tone: 'warning',
+    heading: 'Delete your ReadIn account',
+    message:
+      'You can also do this in the app: <strong>Profile &rarr; Delete account</strong>. Here, enter the e-mail of your account and we will send you a link to confirm. Deleting removes:',
+    extra: `${DELETED_LIST}
+<form id="f" novalidate>
+<label for="e">E-mail address of your ReadIn account</label>
+<div class="field"><input id="e" type="email" autocomplete="email" required></div>
+<button class="btn" id="b" type="submit">Send me the confirmation link</button>
+<div class="msg" id="m"></div></form>
+<p class="small" style="margin-top:14px">Questions? Write to <a href="mailto:micboltech@gmail.com">micboltech@gmail.com</a>.</p>`,
+    script: `
+var f=document.getElementById('f'),e=document.getElementById('e'),b=document.getElementById('b'),m=document.getElementById('m');
+f.addEventListener('submit',function(ev){ev.preventDefault();var v=e.value.trim();
+if(v.indexOf('@')<1){m.className='msg bad';m.textContent='Enter a valid e-mail address.';return}
+b.disabled=true;m.className='msg';m.textContent='Sending…';
+fetch('/api/v1/auth/delete-account/request',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:v})})
+.then(function(r){return r.json().catch(function(){return{}}).then(function(j){return{ok:r.ok,j:j}})})
+.then(function(x){b.disabled=false;m.className=x.ok?'msg good':'msg bad';m.textContent=(x.j&&x.j.message)||(x.ok?'Check your e-mail.':'Something went wrong. Try again.')})
+.catch(function(){b.disabled=false;m.className='msg bad';m.textContent='Could not reach the server. Try again.'})});`,
+  })
+
+/** GET /delete-account/confirm?token=… — the link in the e-mail: last look + the button. */
+export const deleteAccountConfirmPage = (token: string): string =>
+  renderPage({
+    title: 'Confirm account deletion',
+    tone: 'warning',
+    heading: 'Delete your account for good?',
+    message: 'This cannot be undone. Pressing the button permanently deletes:',
+    extra: `${DELETED_LIST}
+<button class="btn" id="b" type="button" style="background:#dc2626">Yes, delete my account</button>
+<p class="small" style="margin-top:12px">Changed your mind? Just close this page &mdash; nothing happens.</p>
+<div class="msg" id="m"></div>`,
+    script: `
+var TOKEN=${JSON.stringify(token).replace(/</g, '\\u003c')};
+var b=document.getElementById('b'),m=document.getElementById('m'),card=document.querySelector('.card');
+b.addEventListener('click',function(){b.disabled=true;m.className='msg';m.textContent='Deleting…';
+fetch('/api/v1/auth/delete-account/confirm',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({token:TOKEN})})
+.then(function(r){return r.json().catch(function(){return{}}).then(function(j){return{ok:r.ok,j:j}})})
+.then(function(x){if(x.ok){card.className='card t-success';card.innerHTML='<h1>Your account was deleted</h1><p>Your account and its data have been removed and you were signed out everywhere. Thank you for reading with us &mdash; you are always welcome back.</p><p class="small">You can close this page now. If ReadIn is still on your phone, you can uninstall it.</p>';}
+else{b.disabled=false;m.className='msg bad';m.textContent=(x.j&&x.j.message)||'Could not delete the account.'}})
+.catch(function(){b.disabled=false;m.className='msg bad';m.textContent='Could not reach the server. Try again.'})});`,
+  })
+
+export const deleteAccountInvalidPage = (): string =>
+  renderPage({
+    title: 'Link expired',
+    tone: 'warning',
+    heading: 'This link is not valid any more',
+    message:
+      'Deletion links work for <strong>1 hour</strong>. Open <a href="/delete-account">the delete-account page</a> to get a new one, or use the app: <strong>Profile &rarr; Delete account</strong>. Nothing was deleted.',
+  })
+
 export const notFoundPage = (): string =>
   renderPage({
     title: 'Page not found',

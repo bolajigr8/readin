@@ -58,7 +58,7 @@ Order matters: S0 → S1 → S2 → S3 are needed to start acquiring users safel
 - [ ] S6.7 [C optional] Server-side `purchase` via GA4 Measurement Protocol for webhook-confirmed payments (env `GA4_MEASUREMENT_ID`, `GA4_API_SECRET`).
 
 ## S7 — Compliance & store readiness — see PLAY_AND_DISTRIBUTION.md
-- [ ] S7.1 [C] **Account deletion**: server `DELETE /users/me` (password re-check; remove user, library/files in Cloudinary, annotations, bookmarks, progress, synced docs, features; keep anonymised payment records for accounting), in-app Profile → Delete account (typed confirmation), web `/delete-account` page + e-mail-confirmed request flow. Tests.
+- [x] S7.1 [C] (done 2026-11-06: app Profile → Delete account (wipes the phone too) + web /delete-account (e-mail link, 1 h) + DELETE /users/me; payments kept without e-mail; e2e 3 tests) **Account deletion**: server `DELETE /users/me` (password re-check; remove user, library/files in Cloudinary, annotations, bookmarks, progress, synced docs, features; keep anonymised payment records for accounting), in-app Profile → Delete account (typed confirmation), web `/delete-account` page + e-mail-confirmed request flow. Tests.
 - [ ] S7.2 [C] Permission audit & flavor manifests (`direct` vs `play`), exact-alarm and foreground-service declarations text, remove unused permissions.
 - [ ] S7.3 [C] `/play-audit` → `PLAY_READINESS.md`; fix items.
 - [ ] S7.4 [C] Store listing text, short/long description, release notes, Data-safety answers, content-rating answers in `project/docs/store/`; screenshot plan (Michael captures).

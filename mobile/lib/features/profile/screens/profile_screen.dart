@@ -407,6 +407,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           iconColor: AppColors.error500,
                           label: 'Sign Out',
                           onTap: _signOut,
+                        ),
+                        SettingsRow(
+                          icon: Ionicons.trash_outline,
+                          iconColor: AppColors.error500,
+                          label: 'Delete account',
+                          sublabel: 'Permanently remove your account and data',
+                          onTap: () => context.push(AppRoutes.deleteAccount),
                           isLast: true,
                         ),
                       ],

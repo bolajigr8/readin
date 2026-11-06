@@ -24,6 +24,7 @@ class AppRoutes {
   static const String badges = '/badges';
   static const String importBook = '/import';
   static const String upgrade = '/upgrade';
+  static const String deleteAccount = '/account/delete';
   static const String audioPlayer = '/audio-player';
 
   // Dev

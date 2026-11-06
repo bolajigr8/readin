@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/account/delete_account_screen.dart';
 import '../../features/auth/providers/auth_providers.dart';
 import '../../features/auth/providers/auth_state.dart';
 import '../../features/auth/screens/forgot_password_screen.dart';
@@ -262,6 +263,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.upgrade,
         pageBuilder: (c, s) =>
             slideUpPage(s, const UpgradeScreen()),
+      ),
+      GoRoute(
+        path: AppRoutes.deleteAccount,
+        pageBuilder: (c, s) => slideUpPage(s, const DeleteAccountScreen()),
       ),
       GoRoute(
         path: AppRoutes.audioPlayer,

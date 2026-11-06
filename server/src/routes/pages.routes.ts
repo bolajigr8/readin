@@ -2,6 +2,8 @@ import { Router } from 'express'
 import {
   landing,
   paymentCallback,
+  deleteAccountPage,
+  deleteAccountConfirmPageHandler,
   resetPasswordPageHandler,
   verifyEmailPageHandler,
 } from '../controllers/pages.controller.js'
@@ -13,5 +15,7 @@ router.get('/', landing)
 router.get('/verify-email', verifyEmailPageHandler)
 router.get('/reset-password', resetPasswordPageHandler)
 router.get('/payment/callback', paymentCallback)
+router.get('/delete-account', deleteAccountPage)
+router.get('/delete-account/confirm', deleteAccountConfirmPageHandler)
 
 export default router

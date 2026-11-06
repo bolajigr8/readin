@@ -1,10 +1,14 @@
 import type { Request, Response } from 'express'
 import asyncHandler from 'express-async-handler'
 import { isResetTokenValid, verifyEmailByToken } from './auth.controller.js'
+import { isDeletionTokenValid } from './account.controller.js'
 import { Payment } from '../models/payment.model.js'
 import { formatNaira } from '../services/billing.logic.js'
 import { settlePayment } from '../services/payments.service.js'
 import {
+  deleteAccountConfirmPage,
+  deleteAccountInvalidPage,
+  deleteAccountRequestPage,
   landingPage,
   notFoundPage,
   paymentResultPage,
@@ -26,6 +30,19 @@ export const landing = (_req: Request, res: Response): void => send(res, 200, la
 export const verifyEmailPageHandler = asyncHandler(async (req: Request, res: Response) => {
   const outcome = await verifyEmailByToken(q(req.query['token']))
   send(res, outcome === 'ok' || outcome === 'already' ? 200 : 400, verifyEmailPage(outcome))
+})
+
+/** GET /delete-account — web account deletion (Google Play's "delete without the app" link). */
+export const deleteAccountPage = (_req: Request, res: Response): void => send(res, 200, deleteAccountRequestPage())
+
+/** GET /delete-account/confirm?token=… (the link in the e-mail) */
+export const deleteAccountConfirmPageHandler = asyncHandler(async (req: Request, res: Response) => {
+  const token = q(req.query['token'])
+  if (!(await isDeletionTokenValid(token))) {
+    send(res, 400, deleteAccountInvalidPage())
+    return
+  }
+  send(res, 200, deleteAccountConfirmPage(token))
 })
 
 /** GET /reset-password?token=… (the link in the e-mail): the "choose a new password" form */
