@@ -67,8 +67,8 @@ const noteRedisOk = (): void => {
   console.warn('[rate-limit] Redis is back — rate limits active again.')
 }
 
-/** Counts as "no hits yet" → the request is allowed (fail open), exactly like passOnStoreError. */
-const openResponse = (): IncrementResponse => ({ totalHits: 0, resetTime: undefined })
+/** Counts as "first hit" → the request is allowed (fail open). Must be ≥ 1: express-rate-limit 8 rejects 0 (ERR_ERL_INVALID_HITS). */
+const openResponse = (): IncrementResponse => ({ totalHits: 1, resetTime: undefined })
 
 /** RedisStore that never throws: an unreachable Redis means "no rate limiting", never an outage. */
 class FailOpenRedisStore extends RedisStore {

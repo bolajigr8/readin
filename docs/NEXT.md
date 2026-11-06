@@ -1,15 +1,16 @@
 # NEXT — where we are right now (Claude Code keeps this current)
 
-**Updated:** 2026-11-06   **Current stage:** Group A — S7.1 done on `feat/s7-account-deletion` (waiting for merge); next S3 landing
-page. Latest log: `sessions/2026-11-06-s7-account-deletion.md`.
+**Updated:** 2026-11-06   **Current stage:** Group A coding complete. Waiting for merge: `feat/s3-site-nextjs` (website as Next.js)
+and `fix/redis-upstash` (Redis TLS + log fixes). Latest log: `sessions/2026-11-06-redis-fix.md`.
 
 ## Done
 - S0, S1 (except S1.6 phone test), S8 two versions (merged). Release key + first signed APKs/AAB 1.0.0+1.
-- S7.1 delete my account (app + web), branch `feat/s7-account-deletion` (also carries the docs branches).
+- S7.1 delete my account (PR #10) and the first S3 site (PR #11) — merged.
 
 ## Half-done / in progress
 - Paystack (APK) paused: Paystack's firewall blocks Render (support contacted 2026-11-06). Play will use Google Play Billing (DECISIONS #16).
-- Redis (Upstash) unreachable → rate limits off → Michael creates an Oregon DB + `rediss://` URL (steps given 2026-11-06).
+- Redis (Upstash): new URL set but Render log still showed ECONNRESET → fix on `fix/redis-upstash` (forces TLS, logs
+  `[redis] connecting to rediss://<host>:6379 (TLS)` + a warning if the URL is wrong). After merge+deploy: read that log line.
 
 ## Next 3 steps
 1. ✅ S7.1 built — Michael: merge `feat/s7-account-deletion` + deploy Render; try Profile → Delete account with a TEST account.
