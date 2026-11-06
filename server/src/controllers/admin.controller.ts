@@ -26,6 +26,7 @@ import {
   describeBlock,
 } from '../services/paystack.service.js'
 import { errorResponse, successResponse } from '../utils/response.utils.js'
+import { clientIp } from '../utils/clientIp.js'
 import {
   FEATURE_KEYS,
   evaluateAccess,
@@ -52,7 +53,7 @@ const audit = async (
       action,
       targetUserId,
       details,
-      ip: req.ip ?? '',
+      ip: clientIp(req),
     } as never)
   } catch (err) {
     console.error('[admin] audit failed:', err)

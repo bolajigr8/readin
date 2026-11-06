@@ -1,7 +1,8 @@
-import rateLimit, { type IncrementResponse } from 'express-rate-limit'
+import rateLimit, { ipKeyGenerator, type IncrementResponse } from 'express-rate-limit'
 import { RedisStore } from 'rate-limit-redis'
 import type { Request, Response } from 'express'
 import { redisConnection } from '../config/redis.js'
+import { clientIp } from '../utils/clientIp.js'
 
 // ── Shared response handler ───────────────────────────────────────────────────
 
@@ -153,11 +154,15 @@ const makeRedisStore = (prefix: string): RedisStore =>
     prefix,
   })
 
+/** One counter per real visitor (IPv6 grouped per /56 like the library default), not per proxy. */
+const keyGenerator = (req: Request): string => ipKeyGenerator(clientIp(req))
+
 // ── Limiters ──────────────────────────────────────────────────────────────────
 
 export const generalLimiter = rateLimit({
   windowMs: Number(process.env['RATE_LIMIT_WINDOW_MS'] ?? '900000'),
   max: Number(process.env['RATE_LIMIT_MAX_GENERAL'] ?? '600'),
+  keyGenerator,
   standardHeaders: true,
   legacyHeaders: false,
   store: makeRedisStore('rl:general:'),
@@ -174,6 +179,7 @@ export const authLimiter = rateLimit({
   skipSuccessfulRequests: true,
   windowMs: 15 * 60 * 1000,
   max: Number(process.env['RATE_LIMIT_MAX_AUTH'] ?? '10'),
+  keyGenerator,
   standardHeaders: true,
   legacyHeaders: false,
   store: makeRedisStore('rl:auth:'),
@@ -184,6 +190,7 @@ export const authLimiter = rateLimit({
 export const uploadLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: Number(process.env['RATE_LIMIT_MAX_UPLOAD'] ?? '20'),
+  keyGenerator,
   standardHeaders: true,
   legacyHeaders: false,
   store: makeRedisStore('rl:upload:'),
@@ -195,6 +202,7 @@ export const uploadLimiter = rateLimit({
 export const adminLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: Number(process.env['RATE_LIMIT_MAX_ADMIN'] ?? '300'),
+  keyGenerator,
   standardHeaders: true,
   legacyHeaders: false,
   store: makeRedisStore('rl:admin:'),
@@ -206,6 +214,7 @@ export const adminLimiter = rateLimit({
 export const syncLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: Number(process.env['RATE_LIMIT_MAX_SYNC'] ?? '600'),
+  keyGenerator,
   standardHeaders: true,
   legacyHeaders: false,
   store: makeRedisStore('rl:sync:'),
