@@ -6,7 +6,7 @@ import { Payment } from '../models/payment.model.js'
 import { User } from '../models/user.model.js'
 import { getBillingConfig } from '../services/billing.service.js'
 import { formatNaira } from '../services/billing.logic.js'
-import { initializeTransaction, paystackConfigured, publicBaseUrl } from '../services/paystack.service.js'
+import { describeBlock, initializeTransaction, paystackConfigured, publicBaseUrl } from '../services/paystack.service.js'
 import { settlePayment } from '../services/payments.service.js'
 import { errorResponse, successResponse } from '../utils/response.utils.js'
 
@@ -57,8 +57,13 @@ export const checkout = asyncHandler(async (req: Request, res: Response) => {
     metadata: { userId: String(user._id), planId: plan.id, planName: plan.name },
   })
   if (!init.ok || !init.data) {
-    console.error('[payments] initialize failed:', init.status, init.message, init.raw ? `| body: ${init.raw}` : '')
-    errorResponse(res, 'Could not start the payment. Please try again.', 502)
+    console.error(
+      '[payments] initialize failed:',
+      init.status,
+      init.message,
+      init.raw === undefined ? '' : `| ${describeBlock(init)} | body: ${init.raw}`,
+    )
+    errorResponse(res, 'Payments are temporarily unavailable. Please try again later.', 502)
     return
   }
 

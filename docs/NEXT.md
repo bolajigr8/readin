@@ -1,7 +1,7 @@
 # NEXT — where we are right now (Claude Code keeps this current)
 
-**Updated:** 2026-11-06   **Current stage:** S1 — code done (S1.2–S1.5) on branch `feat/s1-release-signing`;
-waiting for Michael: S1.1 (create the release key) and S1.6 (real phones). Latest log: `sessions/2026-11-06-s1-signing.md`.
+**Updated:** 2026-11-06   **Current stage:** S1 — done except S1.6 (Michael tests the signed APK on phones). Payments blocked by
+Paystack firewall (fix branch `fix/paystack-diagnostics`). Latest log: `sessions/2026-11-06-s1-signing.md`.
 
 ## Done
 - S0 complete (merged): all checks green, `flutter test` 202/202.
@@ -9,15 +9,14 @@ waiting for Michael: S1.1 (create the release key) and S1.6 (real phones). Lates
   backup OFF; release logging debug-only. Tested with a throwaway key (deleted).
 
 ## Half-done / in progress
+- **Payments blocked**: Paystack firewall refuses POST /transaction/initialize from Render (HTML 403). Fix branch `fix/paystack-diagnostics` (better admin test, Ray ID in logs, kind app message, quiet Redis logs). Michael: deploy → admin Test connection → send Paystack support the Ray ID + Render IP ranges. Upstash Redis unreachable (rate limits off) → Michael checks Upstash + `UPSTASH_REDIS_URL`.
 - S1.1 DONE: first release-signed APKs 1.0.0+1 built 2026-11-06 (`mobile/build/release/1.0.0+1/`, cert SHA-256 15b369e4…0810 ✓). Next: S1.6 phone test by Michael.
-- Pull request for `feat/s1-release-signing` waiting for Michael's merge.
-- Michael to delete leftover test files (git-ignored): `mobile/build/release/` and `mobile/build/app/outputs/flutter-apk/app-*release.apk*`.
 
 ## Next 3 steps
-1. Michael: merge the S1 pull request; Claude: `git switch main && git pull`.
-2. Michael (S1.1): create the key with PLAY_AND_DISTRIBUTION.md §2.1, 2 offline backups, fill `mobile/android/key.properties`
-   → `cd project/mobile && bash tool/build_release.sh` → send Claude the SHA-256/SHA-1 lines (not passwords) to record.
-3. S1.6: uninstall old debug builds on test phones, install the new APK, then later install the next build over it. Then `/stage S2`.
+1. Michael: merge `fix/paystack-diagnostics` → deploy on Render → admin Billing → Test connection → send Paystack support the
+   Ray ID + Render outbound IP ranges (74.220.48.0/24, 74.220.56.0/24); keep Paystack's IP whitelist EMPTY. Check Upstash Redis.
+2. Michael: S1.6 — uninstall old debug build, install `readin-1.0.0-arm64-v8a.apk`, test the main features, report.
+3. Claude: S8 plan (play/direct flavors + AAB) for approval.
 
 ## NEW 2026-11-06: Michael has a Google Play Console account → Play is the main goal (APK stays)
 Verified requirements: PLAY_AND_DISTRIBUTION.md §7b. Order APPROVED by Michael (DECISIONS #15):

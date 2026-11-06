@@ -55,6 +55,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const mails = [] // { to, subject, html, text }
 const tx = new Map() // reference → { amount, currency, status, reportAmount? }
 let verifyCalls = 0
+/** Simulates Paystack's firewall refusing POST requests from our server (HTML 403, like on Render 2026-11-06). */
+let firewallBlocksPost = false
 
 const readBody = (req) =>
   new Promise((resolve) => {
@@ -78,9 +80,17 @@ const fake = http.createServer(async (req, res) => {
   }
 
   if (url.pathname.startsWith('/paystack/')) {
+    if (firewallBlocksPost && req.method === 'POST') {
+      res.writeHead(403, { 'content-type': 'text/html', 'cf-ray': '8f00test1234-LOS' })
+      return res.end('<!DOCTYPE html><html><head><title>Attention Required! | Cloudflare</title></head><body>blocked</body></html>')
+    }
     if (req.headers.authorization !== `Bearer ${PAYSTACK_KEY}`) return send(401, { status: false, message: 'Invalid key' })
+    if (url.pathname === '/paystack/bank' && req.method === 'GET') {
+      return send(200, { status: true, message: 'Banks retrieved', data: [{ name: 'Test Bank' }] })
+    }
     if (url.pathname === '/paystack/transaction/initialize' && req.method === 'POST') {
       const j = JSON.parse(body)
+      if (!(j.amount > 0)) return send(400, { status: false, message: 'Invalid Amount Sent' })
       tx.set(j.reference, { amount: j.amount, currency: j.currency, status: 'abandoned' })
       return send(200, {
         status: true,
@@ -447,6 +457,37 @@ try {
     await users.updateOne({ email: alice }, { $set: { premiumUntil: new Date(Date.now() - DAY) } })
     const u = await me(aliceToken)
     assert.equal(u.plan, 'free')
+  })
+
+  await test('admin "Test connection": key OK and "start payment" gets through → ok, nothing created', async () => {
+    const before = tx.size
+    const r = await call('POST', '/admin/billing/test', { token: adminToken, body: {} })
+    assert.equal(r.status, 200, r.text)
+    assert.equal(r.json.data.ok, true, r.text)
+    assert.equal(tx.size, before, 'the probe must not create a transaction')
+  })
+
+  await test('Paystack firewall blocks "start payment": admin test says so (Ray ID), app gets a kind 502', async () => {
+    firewallBlocksPost = true
+    try {
+      const t = await call('POST', '/admin/billing/test', { token: adminToken, body: {} })
+      assert.equal(t.status, 200, t.text)
+      assert.equal(t.json.data.ok, false, 'admin test must NOT say "working" when payments are blocked')
+      assert.match(t.json.data.message, /firewall/i)
+      assert.match(t.json.data.detail, /8f00test1234-LOS/)
+      const c = await call('POST', '/payments/checkout', { token: aliceToken, body: { planId: await planId() } })
+      assert.equal(c.status, 502)
+      assert.match(c.json.message, /temporarily unavailable/i)
+      assert.match(serverLog, /initialize failed:.*Ray ID 8f00test1234-LOS/)
+    } finally {
+      firewallBlocksPost = false
+    }
+  })
+
+  await test('Redis down is logged once, not on every request', async () => {
+    const n = (serverLog.match(/\[rate-limit\] Redis unavailable/g) ?? []).length
+    assert.ok(n >= 1 && n <= 3, `expected 1-3 "[rate-limit] Redis unavailable" lines, got ${n}`)
+    assert.ok(!serverLog.includes('express-rate-limit: error from store'), 'express-rate-limit still logs every store error')
   })
 
   await test('payments switched off in admin → checkout refused, app told to hide payments', async () => {

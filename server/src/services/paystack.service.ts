@@ -28,7 +28,16 @@ export interface PaystackResult<T> {
   data: T | null
   /** First part of a NON-JSON answer (e.g. a firewall page) — for the server log only. */
   raw?: string
+  /** For NON-JSON answers: the page <title> and Cloudflare's Ray ID (Paystack support asks for these). */
+  pageTitle?: string
+  rayId?: string
 }
+
+/** One log-friendly line describing a NON-JSON (firewall) answer. Empty for normal answers. */
+export const describeBlock = (r: PaystackResult<unknown>): string =>
+  r.raw === undefined
+    ? ''
+    : `firewall page "${r.pageTitle || 'no title'}", Ray ID ${r.rayId || 'none'}, at ${new Date().toISOString()}`
 
 const parseJson = <J>(text: string): J | null => {
   try {
@@ -54,12 +63,19 @@ const call = async <T>(path: string, init: { method?: string; body?: unknown } =
     })
     const text = await res.text().catch(() => '')
     const json = parseJson<{ status?: boolean; message?: string; data?: T }>(text)
+    const title = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(text)?.[1]?.replace(/\s+/g, ' ').trim().slice(0, 120) ?? ''
     return {
       ok: res.ok && json?.status === true,
       status: res.status,
       message: json?.message ?? `Paystack answered HTTP ${res.status}`,
       data: json?.data ?? null,
-      ...(json ? {} : { raw: text.replace(/\s+/g, ' ').slice(0, 300) }),
+      ...(json
+        ? {}
+        : {
+            raw: text.replace(/\s+/g, ' ').slice(0, 300),
+            pageTitle: title,
+            rayId: (res.headers.get('cf-ray') ?? '').slice(0, 60),
+          }),
     }
   } catch (err) {
     console.error('[paystack] request failed:', err)
@@ -73,8 +89,8 @@ export const explainPaystackFailure = (r: PaystackResult<unknown>): string => {
   if (r.status === 401) {
     return 'Paystack rejected the secret key. Copy it again from Paystack → Settings → API Keys & Webhooks (no quotes, no spaces) and make sure it is the key of the SAME account, and that you are using the Test key while in test mode.'
   }
-  if (r.status === 403 && r.raw !== undefined) {
-    return 'Paystack\'s firewall refused the request before it reached your account (the answer was not a normal Paystack message). This is usually temporary or tied to the server address. Retry in a few minutes; if it keeps happening contact Paystack support and give them the time of the request and your Render region.'
+  if (r.raw !== undefined) {
+    return `Paystack's firewall refused the request before it reached your account (the answer was a web page, not a Paystack message). It is tied to the server's internet address (Render's shared outbound IPs), not to your key. Send Paystack support: this ${describeBlock(r)}, your Render region and the outbound IP ranges (Render → service → Connect → Outbound).`
   }
   if (r.status === 403) return `Paystack refused the request: ${r.message}. Check that your Paystack account/business is active and that no IP restriction is set in Settings → API Keys & Webhooks.`
   if (r.status === 429) return 'Paystack says too many requests. Wait a minute and try again.'
@@ -84,6 +100,23 @@ export const explainPaystackFailure = (r: PaystackResult<unknown>): string => {
 
 /** Cheap authenticated call used by the admin panel's "Test connection" button. */
 export const pingPaystack = () => call<unknown>('/bank?country=nigeria&perPage=1')
+
+/**
+ * Second half of "Test connection": the SAME kind of request as a real checkout
+ * (POST /transaction/initialize), deliberately invalid (amount 0) so Paystack
+ * refuses it with a normal JSON error and creates nothing. Paystack's firewall
+ * has blocked exactly this request from Render while GET requests passed, so the
+ * GET alone could say "working" while nobody could pay.
+ * Reachable = Paystack itself answered (any JSON reply other than a key rejection).
+ */
+export const probeStartPayment = async (): Promise<{ reachable: boolean; result: PaystackResult<unknown> }> => {
+  const result = await call<unknown>('/transaction/initialize', {
+    method: 'POST',
+    body: { email: 'connection-test@example.com', amount: 0, currency: 'NGN' },
+  })
+  const reachable = result.raw === undefined && result.status !== 0 && result.status !== 401 && result.status !== 403
+  return { reachable, result }
+}
 
 export interface InitData {
   authorization_url: string
