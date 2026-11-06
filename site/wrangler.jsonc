@@ -1,0 +1,15 @@
+// Cloudflare Workers settings for the public website (readin.micbol.org).
+// The site is a static Next.js export: `pnpm build` writes plain files to `out/`, and Cloudflare serves
+// them as static assets (no server code). `out/_headers` (from public/_headers) sets the security headers.
+// Dashboard: Workers & Pages → readin → Settings → Build: root directory `site`, build `pnpm build`,
+// deploy `npx wrangler deploy`, build variable NODE_VERSION=22.
+{
+  "name": "readin",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./out",
+    // /privacy → privacy.html, unknown pages → our 404.html
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page"
+  }
+}

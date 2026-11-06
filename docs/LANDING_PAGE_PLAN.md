@@ -15,8 +15,14 @@
 > * Gotchas: Links use `prefetch={false}` (Next 16.4 static export writes segment-prefetch files at a different path than
 >   the client asks for → 404s); the theme class is set by an inline script before paint; `<noscript>` shows the
 >   scroll-in sections when JavaScript is off; no fake reviews or invented numbers.
-> * **Cloudflare Pages settings:** root directory `site`, framework preset *Next.js (Static HTML Export)*, build command
->   `pnpm build`, output directory `out`, environment variable `NODE_VERSION=22`.
+> * **Cloudflare (2026-11-07): use PAGES** (Create application → bottom link *Looking to deploy Pages? Get started* → Import Git):
+  root directory `site`, preset *Next.js (Static HTML Export)*, build `pnpm build`, output `out`, `NODE_VERSION=22`; custom domain
+  `readin.micbol.org` = one CNAME at Spaceship (DNS stays at Spaceship; Resend records untouched). Pages ignores `wrangler.jsonc`.
+> * **Backup: Workers** (Cloudflare's default screen now creates a *Worker*): `site/wrangler.jsonc` serves `out/`
+  as static assets. Create application → Import repository `bolajigr8/readin` → project name `readin` → Build command
+  `pnpm build` → Deploy command `npx wrangler deploy` → Advanced settings: Path `/site`, build variable `NODE_VERSION=22`.
+  Domain: Worker → Settings → Domains & Routes → Add → Custom domain `readin.micbol.org` (needs micbol.org on Cloudflare DNS;
+  otherwise use the `readin.<account>.workers.dev` address or move micbol.org's nameservers to Cloudflare).
 >
 > (Older notes below.)
 
