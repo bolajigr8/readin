@@ -74,7 +74,7 @@ Every one of them raises versionCode by exactly 1. Bump on the release branch be
 |---|---|---|
 | Account | Individual identity verification; payments profile if selling | Michael — MANUAL_TASKS |
 | Testing | Individual accounts: closed test with a minimum number of testers for a minimum number of days before production access (confirm numbers) | recruit from APK users; collect their Google-account e-mails with consent |
-| App content | Privacy policy URL (public, not PDF-only), Data safety form, ads declaration (none), content rating (IARC), target audience, news/health/financial declarations (n/a) | S7.4 drafts |
+| App content | Privacy policy URL (public, not PDF-only), Data safety form, ads declaration (none), content rating (IARC), target audience, news/health/financial declarations (n/a) | Privacy URL: **https://readin.micbol.org/privacy** (after the Cloudflare deploy); answers in S7.4 |
 | Account deletion | Apps with account creation must offer deletion **in-app AND via a web URL** | ✅ S7.1 done: app Profile → Delete account; web **https://readin-ehzw.onrender.com/delete-account** (later readin.micbol.org/delete-account) |
 | Permissions | `MANAGE_EXTERNAL_STORAGE` is restricted (only approved for core functions like file managers/backup) → **`direct` flavor only**; `READ_EXTERNAL_STORAGE`≤32 OK; `POST_NOTIFICATIONS` OK; exact alarms: `USE_EXACT_ALARM` is for alarm/calendar apps, `SCHEDULE_EXACT_ALARM` is user-grantable and needs Play declaration — check what `HabitAlarms.kt` uses and prefer inexact/WorkManager-style where acceptable | S7.2 |
 | Foreground service | `mediaPlayback` type declared in manifest ✅; Play Console requires a foreground-service declaration + demo video | MANUAL |

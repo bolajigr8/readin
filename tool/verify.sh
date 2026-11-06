@@ -5,7 +5,7 @@
 #   bash tool/verify.sh --apk      # + release APK build (slow: up to ~20 min the first time)
 #   bash tool/verify.sh --e2e      # + server end-to-end tests (downloads MongoDB once, ~650 MB on Windows)
 #   bash tool/verify.sh --reader   # + reader.html browser tests (uses the installed Edge/Chrome)
-#   bash tool/verify.sh --only server|admin|mobile
+#   bash tool/verify.sh --only server|admin|mobile|site
 # It never stops at the first failure. Full logs: tool/.verify-logs/ (git-ignored).
 set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -109,6 +109,13 @@ if want mobile; then
       run "app: release APK (debug key)" mobile flutter build apk --flavor direct --release --split-per-abi -P ALLOW_DEBUG_SIGNING=true
       echo "NOTE: android/key.properties is missing — this APK is signed with the DEBUG key (do not give it to users)."
     fi
+  fi
+fi
+
+if want site; then
+  run "site: check"       . node tool/site_check.mjs
+  if [ $READER -eq 1 ]; then
+    run "site: browser"     . node tool/site_browser.mjs
   fi
 fi
 
