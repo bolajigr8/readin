@@ -48,3 +48,9 @@
 17. **S8 approved (2026-11-06)**: flavors `direct` (APK: Paystack, whole-phone scan with MANAGE_EXTERNAL_STORAGE) and `play`
     (AAB: no Paystack, no all-files permission — "Choose a folder"/share/open-with stay). Same applicationId. Whole-phone scan in
     Play may be requested later via the Permissions Declaration (document management) once the app is approved — not for launch.
+18. **Launch details (2026-11-06, Michael)**: support e-mail **micboltech@gmail.com** (store listing, privacy, terms, delete-account).
+    Domain: **readin.micbol.org** (subdomain of Michael's micbol.org — free; optional api./admin. subdomains; Resend sender on it).
+    Michael wants prices + free trial set in the ADMIN dashboard: Paystack plans already are; for Google Play prices must exist in
+    Play Console — proposed (a) Play Console at launch with admin showing/toggling, (b) admin edits Google prices via the Play
+    Developer API (service account) later. ❓ waiting: (a)/(b), Cloudflare Pages vs Vercel for the site (Vercel Hobby = non-commercial),
+    where micbol.org DNS is managed.
