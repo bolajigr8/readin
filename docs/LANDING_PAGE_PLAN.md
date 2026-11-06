@@ -1,7 +1,24 @@
 # APK landing page (`project/site`, deployed on Vercel as a SEPARATE project from the admin)
 
-> **Changed 2026-11-06:** built as plain HTML on **Cloudflare Pages** (not Next.js on Vercel) — no build, no packages,
-> commercial use allowed (DECISIONS #18). The original plan below is kept for reference.
+> **Current (2026-11-06, DECISIONS #19):** `project/site` is a **Next.js 16.4.3 app like the admin** (App Router, TypeScript,
+> Tailwind 4, `motion` for animations, `geist` + Fraunces fonts, `lucide-react` icons) built as a **static export** (`out/`)
+> and hosted on **Cloudflare Pages** (free, commercial use allowed). A short-lived plain-HTML version came first; its text was ported.
+>
+> * Commands (in `project/site`): `pnpm install`, `pnpm dev` (preview at http://localhost:3000), `pnpm run typecheck`,
+>   `pnpm run lint`, `pnpm build` (→ `out/`). Checks: `node tool/site_check.mjs` (324 checks on `out/`) and
+>   `node tool/site_browser.mjs` (13 tests in Edge, phone width, light/dark, link clicks, theme switch, release.json;
+>   `SITE_SHOTS=<dir>` saves full-page screenshots). `bash tool/verify.sh --only site --reader` runs all of it.
+> * Content: `src/app/page.tsx` (home: hero with phone mock-up + floating cards, format marquee, bento features, how it
+>   works, privacy, FAQ, final CTA), `privacy/`, `terms/`, `delete-account/`, `not-found.tsx`. Static files in `public/`
+>   (`release.json` drives the download buttons, `_headers` = security headers incl. CSP with 'unsafe-inline' scripts —
+>   static export cannot use nonces).
+> * Gotchas: Links use `prefetch={false}` (Next 16.4 static export writes segment-prefetch files at a different path than
+>   the client asks for → 404s); the theme class is set by an inline script before paint; `<noscript>` shows the
+>   scroll-in sections when JavaScript is off; no fake reviews or invented numbers.
+> * **Cloudflare Pages settings:** root directory `site`, framework preset *Next.js (Static HTML Export)*, build command
+>   `pnpm build`, output directory `out`, environment variable `NODE_VERSION=22`.
+>
+> (Older notes below.)
 
 ## Built 2026-11-06 (S3.1/S3.2) — what exists now
 

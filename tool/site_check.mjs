@@ -1,4 +1,4 @@
-// Static checks for the website in project/site (no packages needed):  node tool/site_check.mjs
+// Static checks for the BUILT website (project/site/out — run `pnpm build` in project/site first):  node tool/site_check.mjs
 // - every page: lang, viewport, title, description; every internal link/image/script exists; every #anchor exists
 // - nothing loaded from other websites (privacy + speed); only allowed outside links
 // - legal pages contain what Google Play and the Data safety form need
@@ -6,7 +6,11 @@ import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const site = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'site')
+const site = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'site', 'out')
+if (!existsSync(path.join(site, 'index.html'))) {
+  console.log('site check: project/site/out is missing — run `pnpm build` in project/site first.')
+  process.exit(1)
+}
 const failures = []
 let checks = 0
 const ok = (cond, msg) => {
@@ -23,8 +27,8 @@ ok(pages.length >= 5, `expected at least 5 pages, found ${pages.length}`)
 for (const must of ['index.html', 'privacy.html', 'terms.html', 'delete-account.html', '404.html']) {
   ok(pages.includes(must), `missing page ${must}`)
 }
-for (const forbidden of ['README.md', 'tests', 'node_modules', '.env']) {
-  ok(!existsSync(path.join(site, forbidden)), `site/${forbidden} would be published — move it out of site/`)
+for (const forbidden of ['README.md', 'tests', 'node_modules', '.env', 'package.json', 'src']) {
+  ok(!existsSync(path.join(site, forbidden)), `out/${forbidden} would be published`)
 }
 
 /** "/privacy" → privacy.html, "/" → index.html, "/img/a.png" → img/a.png */
@@ -39,10 +43,10 @@ const resolveLocal = (href) => {
 
 for (const page of pages) {
   const html = readFileSync(path.join(site, page), 'utf8')
-  ok(/<html lang="en">/.test(html), `${page}: <html lang="en"> missing`)
-  ok(/<meta name="viewport" content="width=device-width, initial-scale=1">/.test(html), `${page}: viewport meta missing`)
+  ok(/<html lang="en"/.test(html), `${page}: <html lang="en"> missing`)
+  ok(/<meta name="viewport" content="width=device-width, initial-scale=1"/.test(html), `${page}: viewport meta missing`)
   ok(/<title>[^<]{5,}<\/title>/.test(html), `${page}: <title> missing`)
-  if (page !== '404.html') ok(/<meta name="description" content="[^"]{20,}">/.test(html), `${page}: description missing`)
+  if (page !== '404.html') ok(/<meta name="description" content="[^"]{20,}"/.test(html), `${page}: description missing`)
   const ids = new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]))
   for (const m of html.matchAll(/\s(href|src)="([^"]+)"/g)) {
     const url = m[2]
