@@ -65,8 +65,8 @@ Order matters: S0 → S1 → S2 → S3 are needed to start acquiring users safel
 - [ ] S7.5 [M] Play Console tasks (identity verification, app creation, declarations, closed test, merchant profile).
 
 ## S8 — Build flavors (`direct` / `play`) & AAB ⚠
-- [ ] S8.1 [C] Gradle product flavors + `--dart-define=DISTRIBUTION=direct|play` exposed as `kDistribution`; `BillingPolicy` abstraction: `direct`→Paystack UI; `play`→consumption-only (no prices/CTAs/links; premium status display only).
-- [ ] S8.2 [C] `flutter build appbundle --flavor play --release`; signing for upload key; document Play App Signing enrolment with the existing key (PEPK).
+- [x] S8.1 [C] (done 2026-11-06: flavors direct/play, `lib/core/distribution.dart`, `billingVisibleProvider` gates every buying UI, server refuses Paystack from play — see session 2026-11-06-s8-flavors) Gradle product flavors + `--dart-define=DISTRIBUTION=direct|play` exposed as `kDistribution`; `BillingPolicy` abstraction: `direct`→Paystack UI; `play`→consumption-only (no prices/CTAs/links; premium status display only).
+- [x] S8.2 [C] (done 2026-11-06: `tool/build_play.sh` → signed AAB + manifest check; upload key optional) `flutter build appbundle --flavor play --release`; signing for upload key; document Play App Signing enrolment with the existing key (PEPK).
 - [ ] S8.3 [later] Play Billing mode via RevenueCat (`purchases_flutter`) behind a server flag; server maps RevenueCat events → `premiumUntil` (code exists in `server/src/services/revenuecat.logic.ts`).
 
 ## S9 — Subscription hardening

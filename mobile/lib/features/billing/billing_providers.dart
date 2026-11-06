@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/api_endpoints.dart';
 import '../../core/api/api_result.dart';
+import '../../core/distribution.dart';
 import '../auth/data/models/auth_user.dart';
 import '../auth/providers/auth_providers.dart';
 import 'billing_models.dart';
@@ -41,8 +42,12 @@ class PublicConfigNotifier extends StateNotifier<PublicConfig> {
 final publicConfigProvider =
     StateNotifierProvider<PublicConfigNotifier, PublicConfig>((ref) => PublicConfigNotifier(ref));
 
-/// Show payment / Premium screens? (the admin's master switch)
-final billingVisibleProvider = Provider<bool>((ref) => ref.watch(publicConfigProvider).billing.enabled);
+/// Show buying screens (plans, prices, Upgrade buttons)? The admin's master switch, and
+/// never in the Google Play version (Play payments policy: no Paystack, no "pay elsewhere").
+/// Premium users still see their status everywhere.
+final billingVisibleProvider = Provider<bool>(
+  (ref) => ref.watch(distributionProvider).allowsPaystack && ref.watch(publicConfigProvider).billing.enabled,
+);
 
 /// Talks to the payment endpoints.
 class BillingApi {

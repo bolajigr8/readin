@@ -1,7 +1,7 @@
 # NEXT — where we are right now (Claude Code keeps this current)
 
-**Updated:** 2026-11-06   **Current stage:** S1 — done except S1.6 (Michael tests the signed APK on phones). Payments blocked by
-Paystack firewall (fix branch `fix/paystack-diagnostics`). Latest log: `sessions/2026-11-06-s1-signing.md`.
+**Updated:** 2026-11-06   **Current stage:** S8 done (two versions: APK `direct` + Play `play` AAB) on `feat/s8-play-flavor`. Paystack (APK) paused —
+firewall blocks Render; Play will use Google Play Billing (DECISIONS #16). Latest log: `sessions/2026-11-06-s1-signing.md`.
 
 ## Done
 - S0 complete (merged): all checks green, `flutter test` 202/202.
@@ -13,10 +13,10 @@ Paystack firewall (fix branch `fix/paystack-diagnostics`). Latest log: `sessions
 - S1.1 DONE: first release-signed APKs 1.0.0+1 built 2026-11-06 (`mobile/build/release/1.0.0+1/`, cert SHA-256 15b369e4…0810 ✓). Next: S1.6 phone test by Michael.
 
 ## Next 3 steps
-1. Michael: merge `fix/paystack-diagnostics` → deploy on Render → admin Billing → Test connection → send Paystack support the
-   Ray ID + Render outbound IP ranges (74.220.48.0/24, 74.220.56.0/24); keep Paystack's IP whitelist EMPTY. Check Upstash Redis.
-2. Michael: S1.6 — uninstall old debug build, install `readin-1.0.0-arm64-v8a.apk`, test the main features, report.
-3. Claude: S8 plan (play/direct flavors + AAB) for approval.
+1. Michael: merge `feat/s8-play-flavor` → deploy Render (server refuses Paystack from the Play version).
+2. Michael: create the Play Console app (com.micbol.readin) + upload `readin-1.0.0-play.aab` to Closed testing ("use my own key"
+   → PEPK steps from Claude); install the APK (S1.6) and report.
+3. Claude: plan Google Play Billing (monthly + yearly via RevenueCat, DECISIONS #16), then S7.1 account deletion + S3 site.
 
 ## NEW 2026-11-06: Michael has a Google Play Console account → Play is the main goal (APK stays)
 Verified requirements: PLAY_AND_DISTRIBUTION.md §7b. Order APPROVED by Michael (DECISIONS #15):

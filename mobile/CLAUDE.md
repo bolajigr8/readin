@@ -12,9 +12,10 @@ flutter test                       # on Windows needs Visual Studio "Desktop dev
 node tool/test_tap_zones.js && node tool/test_viewer_core.js     # JS logic extracted from reader.html / viewer.html
 python tool/audit_dart.py .                                      # fast static checks (imports, symbols, icons)
 cd tool/reader_harness && pnpm install && pnpm test             # reader.html in the installed Edge/Chrome (17 tests)
-flutter run --release -d <deviceId>
-flutter build apk --release --split-per-abi     # needs android/key.properties (or -P ALLOW_DEBUG_SIGNING=true for a test build)
-bash tool/build_release.sh                     # real release: checks + signed APKs + certificate check + notes
+flutter run --release -d <deviceId>            # default flavor = direct (pubspec `default-flavor`); --flavor play to try the Play version
+flutter build apk --flavor direct --release --split-per-abi     # needs android/key.properties (or -P ALLOW_DEBUG_SIGNING=true for a test build)
+bash tool/build_release.sh                     # APK version (direct): checks + signed APKs + certificate check + notes
+bash tool/build_play.sh                        # Google Play version (play): checks + AAB + signature + no-MANAGE_EXTERNAL_STORAGE check
 dart run tool/bump_version.dart patch          # raise version (versionCode +1)
 bash tool/fix_android.sh           # only if Gradle says “project 'app' not found” (Android settings files lost)
 ```
@@ -28,7 +29,7 @@ bash tool/fix_android.sh           # only if Gradle says “project 'app' not fo
 * **Reader** (`features/reader`): `ReaderServer` (loopback HTTP; serves `reader.html`, epub.js, jszip, the book, and **bundled fonts** at `/<token>/fonts/*.woff2`) + WebView (`epub_view.dart`) + `ReaderController` (prefs: font, size, weight, line-height, margin, align, hyphenate, flow, theme, pageAnim…). Typography is applied in `assets/reader/reader.html` (`applyTheme`); quick panel `reader_quick_settings.dart`, full panel `reader_settings_sheet.dart`. PDFs use `pdfrx`; other documents `features/documents` + `assets/reader/viewer.html`.
 * **Entitlements**: `features/features` (`featuresProvider`, `habitsAccessProvider`, cache `@readin/features_cache`); **Billing**: `features/billing` (models, `publicConfigProvider`, `BillingApi`, Paystack WebView checkout `PaystackCheckoutScreen`, `refreshUserProvider`), UI `features/premium/screens/upgrade_screen.dart`; payment UI is shown only when `billingVisibleProvider` (admin switch) or the user is already Premium.
 * Habits (`features/habits`) with native reminders (`android/.../HabitAlarms.kt`, inexact `setAndAllowWhileIdle`, boot receiver `HabitReceiver`) and cloud sync (`core/sync/doc_syncer.dart`, 409 merge). Read-aloud: `flutter_tts` + `ReadAloudService.kt` (foreground service, `mediaPlayback`). Share-intent import, folder scan, open/share file, volume-key paging: `MainActivity.kt` + `core/services/native_bridge.dart`, `volume_keys.dart`.
-* "On this phone" scan (`features/device`) uses `MANAGE_EXTERNAL_STORAGE` — Google Play restricts this permission; plan: `direct` flavor only (S7.2/S8).
+* **Two flavors (S8, DECISIONS #17)**: `direct` (APK from the website: Paystack, "On this phone" whole-device scan with `MANAGE_EXTERNAL_STORAGE`, declared only in `android/app/src/direct/AndroidManifest.xml`) and `play` (Google Play AAB: no Paystack/prices/"pay elsewhere", no all-files scan). Same applicationId. Dart: `lib/core/distribution.dart` (`kDistribution` from `appFlavor`, `distributionProvider` for tests); `billingVisibleProvider` = direct && admin switch — use it for EVERY buying UI. The app sends `X-App-Distribution`; the server refuses Paystack checkout from `play`. Play signing: optional `upload*` keys in key.properties, else the release key. Google Play Billing (monthly + yearly via RevenueCat) is the next step for the play flavor (DECISIONS #16).
 * Toasts: `widgets/app_toast.dart` (opaque). Dev gallery `/dev/gallery` is debug-only (`kDebugMode` in router). Google sign-in is switched off (`kGoogleSignInEnabled=false`).
 
 ## Conventions & gotchas

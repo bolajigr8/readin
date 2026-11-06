@@ -131,6 +131,7 @@ class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
     final billing = cfg.billing;
     final plan = _plan(billing.plans);
     final isPremium = user?.plan == 'premium';
+    final canBuy = ref.watch(billingVisibleProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -146,7 +147,7 @@ class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
               ),
             ),
             Expanded(
-              child: !billing.enabled && !isPremium
+              child: !canBuy && !isPremium
                   ? _Unavailable(onClose: _close)
                   : SingleChildScrollView(
                       padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
@@ -169,7 +170,7 @@ class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
                           const SizedBox(height: 22),
                           _Benefits(freeLimit: billing.freeLibraryLimit),
                           const SizedBox(height: 24),
-                          if (billing.enabled) ...[
+                          if (canBuy) ...[
                             Text(
                               isPremium ? 'ADD MORE TIME' : 'CHOOSE A PLAN',
                               style: AppTypography.label(size: 11, weight: FontWeight.w600, letterSpacing: 0.8, color: AppColors.textMuted),

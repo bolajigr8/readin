@@ -84,3 +84,11 @@ See `ROADMAP.md` — APK release + versioning + landing page, Firebase Analytics
 - No new packages / env vars / server changes. Tests: app 202, tap 4, viewer 9; signing paths tested with a throwaway key.
 - Gotchas: Dart `\s*$` in multiLine regex eats line endings; apksigner 37 prints "V2 Signer: certificate … digest:".
 - Left: S1.1 keystore + S1.6 real phones (Michael).
+
+### 2026-11-06 — S8 flavors (branch `feat/s8-play-flavor`) + payment decisions
+- Decisions #16/#17: Play version = Google Play Billing (monthly + yearly, RevenueCat) — next; APK = Paystack (paused: Paystack's
+  Cloudflare blocks POST /transaction/initialize from Render, Ray ID a564e9a499c6e5c0-PDX; support contacted).
+- Flavors `direct` (APK, Paystack, MANAGE_EXTERNAL_STORAGE) / `play` (AAB, none of these), same applicationId, `default-flavor: direct`.
+  `lib/core/distribution.dart`; `billingVisibleProvider` gates every buying UI; `X-App-Distribution` header; server refuses Paystack from play.
+- `tool/build_play.sh` (AAB + signature + manifest checks); `build_release.sh` uses `--flavor direct`.
+- Tests: app 213, server e2e 26. Both builds produced with the real key. Gotcha: grep a manifest for the permission ENTRY, not the word.

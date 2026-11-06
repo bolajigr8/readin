@@ -6,8 +6,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
-    <!-- "On this phone": find documents anywhere on the device -->
-    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>
+    <!-- MANAGE_EXTERNAL_STORAGE ("On this phone" whole-device scan) is declared ONLY in
+         src/direct/AndroidManifest.xml — Google Play does not allow it for a reading app. -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
     <queries>
         <intent>

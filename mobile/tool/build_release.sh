@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Builds the APKs you give to users, signed with the ReadIn RELEASE key.
+# Builds the APK version (flavor "direct": website download, Paystack) signed with the ReadIn RELEASE key.
+# The Google Play version is built by tool/build_play.sh (AAB).
 #
 #   bash tool/build_release.sh                # checks + universal APK + per-ABI APKs
 #   bash tool/build_release.sh --skip-checks  # only when you ran tool/verify.sh just now
@@ -7,7 +8,7 @@
 # Run from project/mobile (or anywhere: it finds its own folder). Steps:
 #   1. android/key.properties must exist (it is never printed).
 #   2. All app checks (project/tool/verify.sh --only mobile) unless --skip-checks.
-#   3. flutter build apk --release (universal) and --split-per-abi.
+#   3. flutter build apk --flavor direct --release (universal) and --split-per-abi.
 #   4. apksigner verify --print-certs on every APK; stops if one is signed with the
 #      debug key or with a different certificate than the others.
 #   5. Copies the APKs to build/release/<version>/ with a notes file:
@@ -61,10 +62,10 @@ fi
 step "3/5 Build (this can take 10–25 minutes)"
 OUT="$APP/build/app/outputs/flutter-apk"
 rm -f "$OUT"/app-*release.apk "$OUT"/app-*release.apk.sha1 2>/dev/null
-flutter build apk --release || die "universal APK build failed."
-flutter build apk --release --split-per-abi || die "per-ABI APK build failed."
+flutter build apk --flavor direct --release || die "universal APK build failed."
+flutter build apk --flavor direct --release --split-per-abi || die "per-ABI APK build failed."
 shopt -s nullglob
-APKS=("$OUT"/app-release.apk "$OUT"/app-*-release.apk)
+APKS=("$OUT"/app-direct-release.apk "$OUT"/app-*-direct-release.apk)
 shopt -u nullglob
 [ ${#APKS[@]} -ge 2 ] || die "expected APKs in $OUT, found ${#APKS[@]}."
 
@@ -122,8 +123,8 @@ NOTES="$DEST/RELEASE-NOTES-$NAME+$CODE.txt"
 } >"$NOTES"
 for apk in "${APKS[@]}"; do
   base=$(basename "$apk" .apk)
-  abi=${base#app-}; abi=${abi%-release}; [ "$abi" = "release" ] && abi="universal"
-  [ "$base" = "app-release" ] && abi="universal"
+  abi=${base#app-}; abi=${abi%-release}; abi=${abi%direct}; abi=${abi%-}
+  [ -z "$abi" ] && abi="universal"   # app-direct-release.apk = the universal one
   target="readin-$NAME-$abi.apk"
   cp "$apk" "$DEST/$target"
   size=$(awk -v b="$(wc -c <"$apk")" 'BEGIN{printf "%.1f", b/1048576}')

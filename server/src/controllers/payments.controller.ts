@@ -22,6 +22,12 @@ export const checkout = asyncHandler(async (req: Request, res: Response) => {
     errorResponse(res, 'Not authenticated.', 401)
     return
   }
+  // The Google Play version must never sell through Paystack (Play payments policy). The app says
+  // which version it is; old apps send nothing and count as the website/APK version.
+  if (String(req.headers['x-app-distribution'] ?? '').trim().toLowerCase() === 'play') {
+    errorResponse(res, 'Payments are not available in this version of the app.', 403)
+    return
+  }
   const parsed = checkoutSchema.safeParse(req.body)
   if (!parsed.success) {
     errorResponse(res, 'Choose a plan.', 400)

@@ -1,3 +1,4 @@
+import '../../../core/distribution.dart';
 import '../../billing/billing_providers.dart';
 import '../../device/device_files.dart';
 import '../../device/device_files_view.dart';
@@ -129,8 +130,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           ),
         ),
 
-        const LibraryModeSwitch(),
-        if (ref.watch(libraryModeProvider) == 1)
+        // "On this phone" (whole-phone scan) needs the all-files permission → APK version only.
+        if (ref.watch(distributionProvider).allowsWholePhoneScan) const LibraryModeSwitch(),
+        if (ref.watch(distributionProvider).allowsWholePhoneScan && ref.watch(libraryModeProvider) == 1)
           const Expanded(child: DeviceFilesView())
         else ...[
         // Search bar

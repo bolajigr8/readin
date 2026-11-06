@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- APK version only (flavor "direct"). Merged into src/main/AndroidManifest.xml.
+     "On this phone": find documents anywhere on the device. Google Play restricts this
+     permission to file managers etc., so the "play" flavor must never contain it. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>
+</manifest>
