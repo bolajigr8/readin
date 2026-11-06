@@ -35,3 +35,8 @@
     (verifies the certificate). **Phone backup off**: `android:allowBackup="false"` + `data_extraction_rules.xml` excluding all
     data from cloud backup and device-to-device transfer — login tokens are encrypted with a key that never leaves the phone,
     so a restored copy would break sign-in (Michael approved). Versions via `mobile/tool/bump_version.dart`; versionCode +1 every build.
+15. **Play first (2026-11-06)**: Michael has a **personal** Play Console account → closed test with ≥12 testers × 14 days is
+    required. Order approved: S1.1 key → Play-ready minimum (S8 flavors + AAB, S7.1 account deletion, S3 landing page `project/site`
+    with privacy/terms/delete-account, S7.4 listing + forms) → closed test → remaining stages (S2, S4, S5, S6, S9) shipped as
+    updates to testers → `/play-audit` → production. Michael wants **every feature + the landing page ready before the public launch**.
+    Testers only need a Google account to join the Play test; Google sign-in inside ReadIn is NOT required (stays off).

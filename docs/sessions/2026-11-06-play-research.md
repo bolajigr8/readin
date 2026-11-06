@@ -19,3 +19,4 @@ He has not done the S1 tasks yet.
 
 ## Next step
 Michael answers the 3 questions in NEXT.md; does S1.1 (key).
+- Michael 2026-11-06: order approved, personal account, will find 12+ testers, wants all features + landing page ready before launch (DECISIONS #15).

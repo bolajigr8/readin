@@ -19,7 +19,7 @@ waiting for Michael: S1.1 (create the release key) and S1.6 (real phones). Lates
 3. S1.6: uninstall old debug builds on test phones, install the new APK, then later install the next build over it. Then `/stage S2`.
 
 ## NEW 2026-11-06: Michael has a Google Play Console account → Play is the main goal (APK stays)
-Verified requirements: PLAY_AND_DISTRIBUTION.md §7b. Proposed order (waiting for Michael's OK):
+Verified requirements: PLAY_AND_DISTRIBUTION.md §7b. Order APPROVED by Michael (DECISIONS #15):
 1. S1.1 key (now urgent: needed for the AAB + "use my own key" in Play App Signing) → S1.6.
 2. "Play-ready minimum" before the closed test: S8.1/S8.2 (play flavor: no Paystack/prices, no MANAGE_EXTERNAL_STORAGE; AAB),
    S7.1 account deletion (app + server), S3 site with /privacy, /terms, /delete-account, S7.4 store listing + Data safety +
@@ -28,9 +28,7 @@ Verified requirements: PLAY_AND_DISTRIBUTION.md §7b. Proposed order (waiting fo
 4. Apply for production.
 
 ## Open questions for Michael
-- Approve the new order above?
-- Play account type: personal (12 testers × 14 days) or organisation (exempt, needs D-U-N-S)?
-- Can you find 12+ testers with Google accounts who will really use the app for 14 days?
+- None. Answers 2026-11-06: order OK; Play account is personal; Michael will find 12+ testers.
 
 ## Reminders
 - Phones with an old debug build must uninstall once (local-only books on that phone are lost) — warn testers.
