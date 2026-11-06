@@ -52,5 +52,5 @@
     Domain: **readin.micbol.org** (subdomain of Michael's micbol.org — free; optional api./admin. subdomains; Resend sender on it).
     Michael wants prices + free trial set in the ADMIN dashboard: Paystack plans already are; for Google Play prices must exist in
     Play Console — proposed (a) Play Console at launch with admin showing/toggling, (b) admin edits Google prices via the Play
-    Developer API (service account) later. ❓ waiting: (a)/(b), Cloudflare Pages vs Vercel for the site (Vercel Hobby = non-commercial),
-    where micbol.org DNS is managed.
+    Developer API (service account) later. **Michael chose (a) at launch.** Landing page on **Cloudflare Pages** (free, commercial
+    use allowed; Vercel Hobby is non-commercial). micbol.org DNS is managed at **Spaceship**.
