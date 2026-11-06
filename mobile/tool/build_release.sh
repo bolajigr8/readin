@@ -17,6 +17,9 @@ set -uo pipefail
 APP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ROOT="$(cd "$APP/.." && pwd)"
 SKIP_CHECKS=0
+# The ReadIn release certificate (PLAY_AND_DISTRIBUTION.md §2.2). Every APK must match it.
+# Override only for tests: READIN_EXPECTED_CERT="" bash tool/build_release.sh
+EXPECTED_CERT="${READIN_EXPECTED_CERT-15b369e4c58910fba48a25f4e7be6db9497039e90727db7e56b43029c5090810}"
 for a in "$@"; do
   case "$a" in
     --skip-checks) SKIP_CHECKS=1 ;;
@@ -93,6 +96,12 @@ $certs"
     DN=$(grep -m1 -i 'certificate DN:' <<<"$certs" | sed 's/.*certificate DN:[[:space:]]*//' | tr -d '\r')
   elif [ "$cert" != "$FIRST_CERT" ]; then
     die "$(basename "$apk") has a different certificate than the others."
+  fi
+  if [ -n "$EXPECTED_CERT" ] && [ "$cert" != "$EXPECTED_CERT" ]; then
+    die "$(basename "$apk") is NOT signed with the ReadIn release key.
+  expected SHA-256: $EXPECTED_CERT
+  found SHA-256:    $cert
+Check android/key.properties (storeFile) points at ~/readin-keys/readin-release.jks."
   fi
   echo "OK  $(basename "$apk")"
 done

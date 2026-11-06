@@ -35,7 +35,12 @@ manager; never only on this PC). 10 000 days ≈ 27 years (Play requires validit
   `apksigner verify --print-certs` each (refuses the debug key / mixed certificates), copies them to
   `build/release/<version>/readin-<version>-<abi>.apk` with a notes file (certificate SHA-256, sizes, file SHA-256).
 * Debug-key APKs already installed on test phones cannot be updated by release-signed APKs → **uninstall once** (local-only books on that phone are lost).
-* Record here after S1.1: `Release certificate SHA-256: ____`  `SHA-1: ____`  `First release date: ____`.
+* **ReadIn release key (created by Michael 2026-11-06, alias `readin`, RSA 2048, 10 000 days):**
+  * SHA-256: `15:B3:69:E4:C5:89:10:FB:A4:8A:25:F4:E7:BE:6D:B9:49:70:39:E9:07:27:DB:7E:56:B4:30:29:C5:09:08:10`
+    (apksigner form: `15b369e4c58910fba48a25f4e7be6db9497039e90727db7e56b43029c5090810`)
+  * SHA-1: `D6:97:EC:77:47:09:06:EE:E1:78:09:43:A2:11:3B:DD:6C:36:DF:8F`
+  * Every APK/AAB we ship must show exactly this SHA-256 (`tool/build_release.sh` prints it). Use these for Firebase (S6) and
+    Play App Signing ("use my own key"). First release date: ____
 
 ### 2.3 Play App Signing (future, no surprises)
 * Plan: when creating the Play app choose **“Use existing key / upload your own app signing key”** and import `readin-release.jks` via Google's **PEPK** tool (download link and exact command are in Play Console → Setup → App signing; roughly `java -jar pepk.jar --keystore=… --alias=readin --output=output.zip --include-cert --rsa-aes-encryption --encryption-key-path=<Google's public key>`). Result: the Play-delivered app has the **same certificate** as the APK users already have → in-place updates from sideload to Play.
