@@ -80,6 +80,27 @@ Every one of them raises versionCode by exactly 1. Bump on the release branch be
 * `direct` flavor keeps Paystack. Server stays authoritative; both flavors read the same entitlements.
 * Implement the split with `BillingPolicy` + `kDistribution` (S8.1). Also hide Paystack-specific copy (e-mails, landing page) from the Play listing.
 
+## 7b. Verified Google Play facts (researched 2026-11-06 — re-check before submitting)
+Michael has a **Google Play Console account** (2026-11-06) → Play publishing is now the main goal; the APK stays as a second channel.
+| Topic | Fact (source) | ReadIn status / action |
+|---|---|---|
+| Closed test (personal accounts created after 13 Nov 2023) | ≥ **12 testers opted in for the last 14 days continuously**, and they should really use the app; then apply for production (review usually ≤ 7 days). Organisation accounts (D-U-N-S) are exempt. | Critical path: start the closed test as early as possible. Testers need Google accounts. |
+| Target API | New apps + updates must target **API 36 (Android 16)** since 31 Aug 2026 (Play Console Help 11926878). | ✅ targetSdk 36, minSdk 24 (checked in the merged manifest). |
+| 16 KB memory pages | Required for apps targeting Android 15+. | ✅ all arm64 `.so` files are 16 KB-aligned (zipalign -P 16 + ELF check, 2026-11-06). |
+| Format | AAB upload, Play App Signing. | S8.2. **At the first upload choose "use my own key" (import `readin-release.jks` with PEPK)** so APK users can move to Play without uninstalling. Needs S1.1 first. |
+| Payments | Google Play Billing **is available in Nigeria** (merchant registration supported, users pay in naira) → digital Premium sold inside the Play app **must** use Play Billing. Alternative billing / external links programmes cover US, UK, EEA (+ India, South Korea) — **not Nigeria** (June 2026 blog). | Keep DECISIONS #2: Play build = no prices, no Paystack, no links to buy elsewhere (phase A); Play Billing later (S8.3). Paystack stays in the APK. Merchant payouts in USD to a domiciliary account. |
+| `MANAGE_EXTERNAL_STORAGE` | Only for approved core uses (e.g. document management) with a declaration; file picking / reading own library must use the Storage Access Framework. | Remove from the Play build (S8 flavors). The system file picker + share/open-with already cover imports. |
+| Foreground service | `mediaPlayback` type ✅ in manifest; Play Console → App content → Foreground service: choose Media playback + a short demo video (app reading aloud while minimised). | Michael records the video. |
+| Account deletion | Apps with sign-up must offer deletion **in the app AND on a web page** that works without the app; link in the Data safety form; say what is kept and why. | S7.1 (server + app) + site `/delete-account` (S3). |
+| Privacy policy | Required for every app; public web page (not a PDF), must match the Data safety answers. | Site `/privacy` (S3). |
+| Data safety form | Must be accurate (misrepresentation = removal). Covers e-mail, name, books/notes/progress, crash/analytics (if added), purchase history; processors; encryption in transit; deletion. | S7.4 draft answers; update when Firebase (S6) is added. |
+| App access for reviewers | Give a working login (no 2-step, no expiry) + instructions; the reviewer must reach every feature incl. Premium screens. | Create a verified reviewer account; give it Premium via admin gift. |
+| Other App content forms | Ads (none), content rating (IARC questionnaire), target audience (choose 13+ or 18+ — under-13 brings the Families policy), news/health/financial/government (no). | S7.4 answers. |
+| Developer verification (sideloading) | Play-verified developers: eligible Play apps are **registered automatically**; Play Console can also register apps distributed outside Play. Enforcement: Brazil, Indonesia, Singapore, Thailand from 30 Sep 2026; **global in 2027**. Unregistered apps still installable via ADB / "advanced flow". | Nigeria not enforced yet; once the app is on Play with the same key, check Play Console shows it registered (covers the APK too). |
+| User monitoring | No Google Tag Manager needed (GTM for apps only forwards Firebase events). **Play Console gives for free**: installs/uninstalls, countries, devices, ratings/reviews, **Android vitals** (crashes, ANRs, slow start), acquisition reports. Detailed in-app behaviour = Firebase Analytics + Crashlytics (S6, with consent). | Use Play Console now; S6 later. |
+Sources: Play Console Help (target API 11926878, account deletion 13327111, Data safety 10787469, All-files access 10467955,
+supported locations 9306917, payments 10281818), Android Developers Blog (2026-03 developer verification, 2026-06 billing choice).
+
 ## 8. Release process (target state)
 1. `/verify-all` → 2. bump version → 3. `tool/build_release.sh` (verify signature + print SHA-256) → 4. upload APK to the host → 5. add the release in admin → 6. test update-over-install on a real phone → 7. announce. Keep a table of releases below.
 
