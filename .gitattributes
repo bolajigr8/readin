@@ -1,4 +1,4 @@
-# Shell scripts must keep LF line endings, or bash fails with "$'': command not found"
+# Shell scripts must keep LF line endings, or bash fails with "command not found" errors
 # on a fresh Windows checkout (core.autocrlf=true).
 *.sh text eol=lf
 .husky/* text eol=lf
