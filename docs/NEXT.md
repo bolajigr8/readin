@@ -1,19 +1,18 @@
 # NEXT — where we are right now (Claude Code keeps this current)
 
-**Updated:** 2026-11-06   **Current stage:** S8 done (two versions: APK `direct` + Play `play` AAB) on `feat/s8-play-flavor`. Paystack (APK) paused —
-firewall blocks Render; Play will use Google Play Billing (DECISIONS #16). Latest log: `sessions/2026-11-06-s1-signing.md`.
+**Updated:** 2026-11-06   **Current stage:** Group A — S7.1 done on `feat/s7-account-deletion` (waiting for merge); next S3 landing
+page. Latest log: `sessions/2026-11-06-s7-account-deletion.md`.
 
 ## Done
-- S0 complete (merged): all checks green, `flutter test` 202/202.
-- S1.2–S1.5 (2026-11-06): release build fails without the key; `tool/build_release.sh`; `tool/bump_version.dart`;
-  backup OFF; release logging debug-only. Tested with a throwaway key (deleted).
+- S0, S1 (except S1.6 phone test), S8 two versions (merged). Release key + first signed APKs/AAB 1.0.0+1.
+- S7.1 delete my account (app + web), branch `feat/s7-account-deletion` (also carries the docs branches).
 
 ## Half-done / in progress
-- **Payments blocked**: Paystack firewall refuses POST /transaction/initialize from Render (HTML 403). Fix branch `fix/paystack-diagnostics` (better admin test, Ray ID in logs, kind app message, quiet Redis logs). Michael: deploy → admin Test connection → send Paystack support the Ray ID + Render IP ranges. Upstash Redis unreachable (rate limits off) → Michael checks Upstash + `UPSTASH_REDIS_URL`.
-- S1.1 DONE: first release-signed APKs 1.0.0+1 built 2026-11-06 (`mobile/build/release/1.0.0+1/`, cert SHA-256 15b369e4…0810 ✓). Next: S1.6 phone test by Michael.
+- Paystack (APK) paused: Paystack's firewall blocks Render (support contacted 2026-11-06). Play will use Google Play Billing (DECISIONS #16).
+- Redis (Upstash) unreachable → rate limits off → Michael creates an Oregon DB + `rediss://` URL (steps given 2026-11-06).
 
 ## Next 3 steps
-1. Claude: S7.1 account deletion — plan for approval (user data) → build.
+1. ✅ S7.1 built — Michael: merge `feat/s7-account-deletion` + deploy Render; try Profile → Delete account with a TEST account.
 2. Claude: S3 landing page `project/site` (privacy, terms, delete-account) + render buildFilter; then S7.4 store texts/forms.
 3. Michael: then create the Play Console app → "use my own key" (Claude gives PEPK steps) → closed test, 12+ testers, 14 days.
 Order agreed 2026-11-06: Group A (S7.1, S3, S7.4, S7.2) → upload + closed test → Group B during the test (Play Billing monthly+yearly,
