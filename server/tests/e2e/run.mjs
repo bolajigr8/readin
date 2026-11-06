@@ -536,6 +536,107 @@ try {
     }
   })
 
+  // ── S7.1 account deletion ────────────────────────────────────────────────────
+  const db = mongoose.connection
+  const seedUserData = async (email) => {
+    const u = await users.findOne({ email })
+    const userId = u._id
+    const bookId = new mongoose.Types.ObjectId()
+    await db.collection('books').insertOne({ _id: bookId, userId, title: `Book of ${email}`, status: 'ready', source: 'upload' })
+    await db.collection('annotations').insertOne({ userId, bookId, text: 'note' })
+    await db.collection('bookmarks').insertOne({ userId, bookId, cfi: 'x' })
+    await db.collection('progresses').insertOne({ userId, bookId, percentage: 10 })
+    await db.collection('userdatas').insertOne({ userId, key: 'habits', data: {}, version: 1 })
+    await db.collection('userfeatures').insertOne({ userId, key: 'habits', trialStartedAt: new Date() })
+    await db.collection('payments').insertOne({ userId, email, planId: 'monthly', planName: 'Monthly', reference: `ref_${userId}`, amountKobo: 150000, currency: 'NGN', durationDays: 30, status: 'success', applied: true })
+    return userId
+  }
+  const countFor = async (userId) => {
+    const names = ['books', 'annotations', 'bookmarks', 'progresses', 'userdatas', 'userfeatures']
+    const counts = await Promise.all(names.map((n) => db.collection(n).countDocuments({ userId })))
+    return Object.fromEntries(names.map((n, i) => [n, counts[i]]))
+  }
+
+  await test('delete my account in the app: wrong password refused; right password removes everything, keeps an anonymous payment', async () => {
+    const dave = 'dave@readin.test'
+    const erin = 'erin@readin.test'
+    await registerAndVerify(dave, 'Dave')
+    await registerAndVerify(erin, 'Erin')
+    const daveId = await seedUserData(dave)
+    const erinId = await seedUserData(erin)
+    const token = await login(dave)
+
+    const wrong = await call('DELETE', '/users/me', { token, body: { password: 'not-my-password' } })
+    assert.equal(wrong.status, 403, wrong.text)
+    assert.match(wrong.json.message, /password is not correct/i)
+    assert.equal((await countFor(daveId)).books, 1, 'nothing may be deleted after a wrong password')
+
+    const before = mails.length
+    const ok = await call('DELETE', '/users/me', { token, body: { password: PASSWORD } })
+    assert.equal(ok.status, 200, ok.text)
+    assert.deepEqual(Object.values(await countFor(daveId)), [0, 0, 0, 0, 0, 0], 'all of Dave’s data must be gone')
+    assert.equal(await users.countDocuments({ email: dave }), 0, 'the account must be gone')
+    const pay = await payments.findOne({ userId: daveId })
+    assert.ok(pay, 'the payment record is kept for accounting')
+    assert.equal(pay.email, '', 'but without the e-mail address')
+    assert.deepEqual(Object.values(await countFor(erinId)), [1, 1, 1, 1, 1, 1], 'another user’s data must be untouched')
+    assert.equal((await payments.findOne({ userId: erinId })).email, erin)
+
+    assert.equal((await call('GET', '/users/me', { token })).status, 401, 'the old sign-in must stop working at once')
+    assert.equal((await call('POST', '/auth/login', { body: { email: dave, password: PASSWORD } })).status, 401)
+    const bye = await nextMailTo(dave, before, /deleted/i)
+    assert.match(bye.subject, /was deleted/i)
+    const audit = await db.collection('adminaudits').findOne({ action: 'account.deleted_by_user', targetUserId: daveId })
+    assert.ok(audit, 'an audit line is written')
+    assert.ok(!JSON.stringify(audit).includes(dave), 'the audit line holds no e-mail address')
+  })
+
+  await test('delete my account on the web: same answer for unknown e-mails; link → page → button deletes; link works once', async () => {
+    const frank = 'frank@readin.test'
+    await registerAndVerify(frank, 'Frank')
+    const frankId = await seedUserData(frank)
+
+    const unknown = await call('POST', '/auth/delete-account/request', { body: { email: 'nobody@readin.test' } })
+    const known0 = mails.length
+    const known = await call('POST', '/auth/delete-account/request', { body: { email: frank } })
+    assert.equal(unknown.status, 200)
+    assert.equal(known.status, 200)
+    assert.equal(unknown.json.message, known.json.message, 'no account fishing')
+
+    const link = tokenFrom(await nextMailTo(frank, known0, /delete/i), 'delete-account/confirm')
+    const page = await call('GET', `${ORIGIN}/delete-account/confirm?token=${encodeURIComponent(link)}`, { headers: { accept: 'text/html' } })
+    assert.equal(page.status, 200)
+    assert.match(page.text, /Delete your account for good/)
+    assert.equal(await users.countDocuments({ email: frank }), 1, 'opening the page alone deletes nothing')
+
+    const bad = await call('POST', '/auth/delete-account/confirm', { body: { token: 'x'.repeat(64) } })
+    assert.equal(bad.status, 400)
+    const badPage = await call('GET', `${ORIGIN}/delete-account/confirm?token=nope`, { headers: { accept: 'text/html' } })
+    assert.equal(badPage.status, 400)
+
+    const done = await call('POST', '/auth/delete-account/confirm', { body: { token: link } })
+    assert.equal(done.status, 200, done.text)
+    assert.equal(await users.countDocuments({ email: frank }), 0)
+    assert.equal((await countFor(frankId)).books, 0)
+    assert.equal((await call('POST', '/auth/delete-account/confirm', { body: { token: link } })).status, 400, 'the link works only once')
+
+    const form = await call('GET', `${ORIGIN}/delete-account`, { headers: { accept: 'text/html' } })
+    assert.equal(form.status, 200)
+    assert.match(form.text, /Delete your ReadIn account/)
+  })
+
+  await test('an expired web deletion link deletes nothing', async () => {
+    const gina = 'gina@readin.test'
+    await registerAndVerify(gina, 'Gina')
+    const m0 = mails.length
+    await call('POST', '/auth/delete-account/request', { body: { email: gina } })
+    const link = tokenFrom(await nextMailTo(gina, m0, /delete/i), 'delete-account/confirm')
+    await users.updateOne({ email: gina }, { $set: { accountDeletionExpires: new Date(Date.now() - 1000) } })
+    const r = await call('POST', '/auth/delete-account/confirm', { body: { token: link } })
+    assert.equal(r.status, 400)
+    assert.equal(await users.countDocuments({ email: gina }), 1)
+  })
+
   await test('the server log never prints the Paystack key or JWT secrets', async () => {
     assert.ok(!serverLog.includes(PAYSTACK_KEY))
     assert.ok(!serverLog.includes(env.JWT_SECRET) && !serverLog.includes(env.JWT_REFRESH_SECRET))

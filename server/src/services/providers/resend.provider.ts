@@ -3,6 +3,8 @@
 import { Resend } from 'resend'
 import type { IEmailProvider } from '../email/email.interface.js'
 import {
+  accountDeletedEmail,
+  accountDeletionLinkEmail,
   passwordChangedEmail,
   passwordResetEmail,
   receiptEmail,
@@ -56,6 +58,17 @@ export class ResendProvider implements IEmailProvider {
 
   sendPasswordChangedEmail(to: string, name: string): Promise<void> {
     return this.send(to, passwordChangedEmail(name))
+  }
+
+  sendAccountDeletionLinkEmail(to: string, name: string, token: string): Promise<void> {
+    return this.send(
+      to,
+      accountDeletionLinkEmail(name, `${this.appUrl}/delete-account/confirm?token=${encodeURIComponent(token)}`),
+    )
+  }
+
+  sendAccountDeletedEmail(to: string, name: string): Promise<void> {
+    return this.send(to, accountDeletedEmail(name))
   }
 
   sendPaymentReceiptEmail(input: Parameters<IEmailProvider['sendPaymentReceiptEmail']>[0]): Promise<void> {

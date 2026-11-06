@@ -36,6 +36,14 @@ export class EmailService {
     return this.provider.sendPasswordChangedEmail(to, name)
   }
 
+  sendAccountDeletionLinkEmail(to: string, name: string, token: string): Promise<void> {
+    return this.provider.sendAccountDeletionLinkEmail(to, name, token)
+  }
+
+  sendAccountDeletedEmail(to: string, name: string): Promise<void> {
+    return this.provider.sendAccountDeletedEmail(to, name)
+  }
+
   sendPaymentReceiptEmail(input: Parameters<IEmailProvider['sendPaymentReceiptEmail']>[0]): Promise<void> {
     return this.provider.sendPaymentReceiptEmail(input)
   }

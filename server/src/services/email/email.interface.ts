@@ -11,6 +11,10 @@ export interface IEmailProvider {
   sendPasswordResetEmail(to: string, name: string, token: string): Promise<void>
   sendWelcomeEmail(to: string, name: string): Promise<void>
   sendPasswordChangedEmail(to: string, name: string): Promise<void>
+  /** Web account deletion: the 1-hour confirmation link. */
+  sendAccountDeletionLinkEmail(to: string, name: string, token: string): Promise<void>
+  /** Sent right before the account is deleted (we still know the address). */
+  sendAccountDeletedEmail(to: string, name: string): Promise<void>
   sendPaymentReceiptEmail(input: {
     to: string
     name: string

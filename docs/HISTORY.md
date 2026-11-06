@@ -92,3 +92,8 @@ See `ROADMAP.md` — APK release + versioning + landing page, Firebase Analytics
   `lib/core/distribution.dart`; `billingVisibleProvider` gates every buying UI; `X-App-Distribution` header; server refuses Paystack from play.
 - `tool/build_play.sh` (AAB + signature + manifest checks); `build_release.sh` uses `--flavor direct`.
 - Tests: app 213, server e2e 26. Both builds produced with the real key. Gotcha: grep a manifest for the permission ENTRY, not the word.
+
+### 2026-11-06 — S7.1 account deletion (branch `feat/s7-account-deletion`)
+- App: Profile → Delete account (password + type DELETE) → server deletes → phone wiped (tokens, settings, books, reminders) → app restarts fresh.
+- Web: /delete-account → e-mail link (1 h, hashed) → confirm page → delete. URL for Play Console: https://readin-ehzw.onrender.com/delete-account.
+- Kept: payment records without e-mail; audit line without e-mail. Tests: server e2e 29, app 217.

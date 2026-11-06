@@ -111,6 +111,32 @@ export const passwordResetEmail = (name: string, url: string): Rendered => ({
   text: `Hi ${name || 'there'},\n\nReset your ReadIn password:\n${url}\n\nThis link works for 1 hour. If you did not ask for this, ignore this e-mail - your password has not changed.`,
 })
 
+export const accountDeletionLinkEmail = (name: string, url: string): Rendered => ({
+  subject: 'Confirm: delete your ReadIn account',
+  html: layout({
+    preheader: 'Someone asked to delete your ReadIn account. Confirm only if it was you.',
+    title: 'Delete your ReadIn account?',
+    body: `<p style="margin:0 0 12px 0;">Hi ${first(name)}, we received a request to <strong>permanently delete</strong> your ReadIn account. This removes your account, your books in the cloud, notes, highlights, bookmarks, reading progress and habits. It cannot be undone.</p>`,
+    button: { label: 'Review and delete my account', url },
+    after: 'This link works for <strong>1 hour</strong>. The next page shows everything once more before anything is deleted.',
+    notice: '<strong>Didn&rsquo;t ask for this?</strong> Ignore this e-mail &mdash; nothing will be deleted.',
+  }),
+  text: `Hi ${name || 'there'},\n\nSomeone asked to permanently delete your ReadIn account. To continue, open:\n${url}\n\nThe link works for 1 hour. If this was not you, ignore this e-mail - nothing will be deleted.`,
+})
+
+export const accountDeletedEmail = (name: string): Rendered => ({
+  subject: 'Your ReadIn account was deleted',
+  html: layout({
+    preheader: 'Your ReadIn account and its data have been deleted.',
+    title: 'Your account was deleted',
+    body: `<p style="margin:0 0 12px 0;">Hi ${first(name)}, your ReadIn account and its data (books in the cloud, notes, highlights, bookmarks, reading progress and habits) have been deleted. You were signed out on every device.</p>
+<p style="margin:0 0 12px 0;">We keep only payment records without your e-mail (amount, date, plan), because the law requires them for accounting.</p>
+<p style="margin:0;">Thank you for reading with us. You are always welcome back.</p>`,
+    notice: '<strong>Wasn&rsquo;t you?</strong> Reply to this e-mail right away.',
+  }),
+  text: `Hi ${name || 'there'}, your ReadIn account and its data have been deleted and you were signed out on every device. We keep only payment records without your e-mail, for accounting. If this wasn't you, reply to this e-mail right away.`,
+})
+
 export const welcomeEmail = (name: string): Rendered => {
   const li = (t: string): string =>
     `<tr><td valign="top" style="padding:7px 12px 7px 0;color:${ORANGE};font-size:16px;">&#10003;</td><td style="padding:7px 0;font-size:15px;line-height:1.55;color:${MUTED};">${t}</td></tr>`
