@@ -26,7 +26,8 @@ S2 update prompt, S4 biometrics, S6 Firebase, S5 roles, S9, Paystack phone-side 
 - NOT uploading to Play yet (Michael, 2026-11-06) — remind when Group A is done: create app (Free, App), PEPK "use my own key".
 - Later: merchant profile (USD domiciliary account), monthly+yearly subscriptions, RevenueCat account; Vercel site project;
   domain?; Resend domain verification; Firebase project; Paystack live keys.
-- Decisions pending: prices monthly/yearly + free trial?; domain; support e-mail.
+- Decisions pending: free trial for Premium (yes/no, days). Prices decided: ₦800/month, ₦8,000/year (DECISIONS #20).
+- Website LIVE 2026-11-07: readin.micbol.org (Cloudflare Pages, auto-deploys from main). APK hosting: github.com/bolajigr8/readin-releases (tag v1.0.0) → then fill site/public/release.json.
 
 ## NEW 2026-11-06: Michael has a Google Play Console account → Play is the main goal (APK stays)
 Verified requirements: PLAY_AND_DISTRIBUTION.md §7b. Order APPROVED by Michael (DECISIONS #15):
