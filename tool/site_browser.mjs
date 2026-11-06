@@ -10,7 +10,11 @@ import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const site = path.join(root, 'site')
+const site = path.join(root, 'site', 'out') // the static export (`pnpm build` in project/site)
+if (!existsSync(path.join(site, 'index.html'))) {
+  console.log('project/site/out is missing — run `pnpm build` in project/site first.')
+  process.exit(1)
+}
 const require = createRequire(path.join(root, 'mobile', 'tool', 'reader_harness', 'package.json'))
 const { chromium } = require('playwright-core')
 
@@ -26,7 +30,7 @@ for (const line of readFileSync(path.join(site, '_headers'), 'utf8').split(/\r?\
 }
 delete headers['Strict-Transport-Security'] // local http
 
-const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json', '.png': 'image/png', '.xml': 'application/xml', '.txt': 'text/plain' }
+const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json', '.png': 'image/png', '.xml': 'application/xml', '.txt': 'text/plain', '.woff2': 'font/woff2', '.ico': 'image/x-icon', '.svg': 'image/svg+xml' }
 let releaseOverride = null
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x').pathname
@@ -35,7 +39,9 @@ const server = http.createServer((req, res) => {
     return res.end(JSON.stringify(releaseOverride))
   }
   let file = url === '/' ? 'index.html' : url.slice(1)
-  if (!existsSync(path.join(site, file)) && existsSync(path.join(site, `${file}.html`))) file = `${file}.html`
+  // Like Cloudflare Pages: /privacy → privacy.html (Next also writes a privacy/ folder with data files).
+  const isFile = (f) => existsSync(path.join(site, f)) && statSync(path.join(site, f)).isFile()
+  if (!isFile(file) && isFile(`${file}.html`)) file = `${file}.html`
   const full = path.join(site, file)
   if (!full.startsWith(site) || !existsSync(full) || !statSync(full).isFile()) {
     res.writeHead(404, { ...headers, 'content-type': TYPES['.html'] })
@@ -105,7 +111,21 @@ for (const p of ['/', '/privacy', '/terms', '/delete-account']) {
         // SITE_SHOTS=<folder> → also save a phone screenshot of each page (for a visual check).
         if (process.env.SITE_SHOTS) {
           const name = `${p === '/' ? 'home' : p.slice(1)}-${scheme}.png`
-          await v.page.screenshot({ path: path.join(process.env.SITE_SHOTS, name) })
+          // scroll through the page so the fade-in sections appear, then back to the top
+          await v.page.evaluate(async () => {
+            for (let y = 0; y < document.body.scrollHeight; y += 300) {
+              window.scrollTo({ top: y, behavior: 'instant' })
+              await new Promise((r) => setTimeout(r, 60))
+            }
+            window.scrollTo({ top: 0, behavior: 'instant' })
+          })
+          await v.page.waitForTimeout(900)
+          await v.page.screenshot({ path: path.join(process.env.SITE_SHOTS, name), fullPage: true })
+          if (p === '/') {
+            await v.page.setViewportSize({ width: 1280, height: 860 })
+            await v.page.waitForTimeout(400)
+            await v.page.screenshot({ path: path.join(process.env.SITE_SHOTS, `home-desktop-${scheme}.png`) })
+          }
         }
       } finally {
         await v.ctx.close()
@@ -113,6 +133,38 @@ for (const p of ['/', '/privacy', '/terms', '/delete-account']) {
     })
   }
 }
+
+await test('clicking footer links really opens the pages (home → privacy → delete-account → home)', async () => {
+  const v = await visit('/', 'light')
+  try {
+    await v.page.locator('footer a', { hasText: 'Privacy policy' }).click()
+    await v.page.waitForURL('**/privacy', { timeout: 10000 })
+    await v.page.locator('h1', { hasText: 'Privacy policy' }).waitFor({ timeout: 10000 })
+    await v.page.locator('footer a', { hasText: 'Delete my account' }).click()
+    await v.page.waitForURL('**/delete-account', { timeout: 10000 })
+    await v.page.locator('h1', { hasText: 'Delete your ReadIn account' }).waitFor({ timeout: 10000 })
+    await v.page.locator('header a', { hasText: 'ReadIn' }).first().click()
+    await v.page.locator('h1', { hasText: 'Fall in love with' }).waitFor({ timeout: 10000 })
+    await v.page.waitForLoadState('networkidle')
+    if (v.problems.length) throw new Error(v.problems.join(' | '))
+  } finally {
+    await v.ctx.close()
+  }
+})
+
+await test('the light/dark switch changes the theme and remembers it', async () => {
+  const v = await visit('/', 'light')
+  try {
+    const isDark = () => v.page.evaluate(() => document.documentElement.classList.contains('dark'))
+    if (await isDark()) throw new Error('should start light (phone setting = light)')
+    await v.page.getByRole('button', { name: /dark mode/i }).click()
+    if (!(await isDark())) throw new Error('did not switch to dark')
+    await v.page.reload({ waitUntil: 'networkidle' })
+    if (!(await isDark())) throw new Error('choice not remembered after reload')
+  } finally {
+    await v.ctx.close()
+  }
+})
 
 await test('unknown address shows the 404 page', async () => {
   const v = await visit('/no-such-page', 'light')

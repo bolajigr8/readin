@@ -113,6 +113,10 @@ if want mobile; then
 fi
 
 if want site; then
+  run "site: install"     site pnpm install --frozen-lockfile
+  run "site: typecheck"   site pnpm run typecheck
+  run "site: lint"        site pnpm run lint
+  run "site: build"       site pnpm run build
   run "site: check"       . node tool/site_check.mjs
   if [ $READER -eq 1 ]; then
     run "site: browser"     . node tool/site_browser.mjs
