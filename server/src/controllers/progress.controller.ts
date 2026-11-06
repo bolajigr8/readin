@@ -77,7 +77,7 @@ export const saveProgress = asyncHandler(
         $set: setFields,
         $inc: { readingTimeSeconds: readingTimeDeltaSeconds },
       },
-      { upsert: true, new: true, setDefaultsOnInsert: true },
+      { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
     )
 
     successResponse(res, { progress }, 'Progress saved.')

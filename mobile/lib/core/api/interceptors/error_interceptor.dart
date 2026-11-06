@@ -64,8 +64,15 @@ class ErrorInterceptor extends Interceptor {
       429 => RateLimitException(
           message: message ?? 'Too many requests. Please slow down.',
         ),
-      500 || 502 || 503 || 504 => ServerException(
+      // 500 = unexpected crash: never show its text. 502/503/504 from OUR server carry
+      // a message written for users (e.g. "Payments are temporarily unavailable…");
+      // Render's own gateway pages are HTML (no JSON message) → generic text.
+      500 => ServerException(
           message: 'Server error. Please try again later.',
+          statusCode: code,
+        ),
+      502 || 503 || 504 => ServerException(
+          message: message ?? 'Server error. Please try again later.',
           statusCode: code,
         ),
       _ => ServerException(

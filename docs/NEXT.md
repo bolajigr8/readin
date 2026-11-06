@@ -9,6 +9,7 @@ waiting for Michael: S1.1 (create the release key) and S1.6 (real phones). Lates
   backup OFF; release logging debug-only. Tested with a throwaway key (deleted).
 
 ## Half-done / in progress
+- **Payments blocked**: Paystack firewall refuses POST /transaction/initialize from Render (HTML 403). Fix branch `fix/paystack-diagnostics` (better admin test, Ray ID in logs, kind app message, quiet Redis logs). Michael: deploy → admin Test connection → send Paystack support the Ray ID + Render IP ranges. Upstash Redis unreachable (rate limits off) → Michael checks Upstash + `UPSTASH_REDIS_URL`.
 - S1.1 key created (fingerprints recorded). First signed build failed: keyPassword in `mobile/android/key.properties` wrong → Michael fixes, then rerun `bash tool/build_release.sh`.
 - Pull request for `feat/s1-release-signing` waiting for Michael's merge.
 - Michael to delete leftover test files (git-ignored): `mobile/build/release/` and `mobile/build/app/outputs/flutter-apk/app-*release.apk*`.

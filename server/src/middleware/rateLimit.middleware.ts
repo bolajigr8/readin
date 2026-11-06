@@ -1,4 +1,4 @@
-import rateLimit from 'express-rate-limit'
+import rateLimit, { type IncrementResponse } from 'express-rate-limit'
 import { RedisStore } from 'rate-limit-redis'
 import type { Request, Response } from 'express'
 import { redisConnection } from '../config/redis.js'
@@ -49,8 +49,70 @@ const withTimeout = <T>(p: Promise<T>): Promise<T> =>
     )
   })
 
+/**
+ * Redis outage logging: ONE line when rate limiting pauses and one when it is back,
+ * instead of a stack trace on every request (express-rate-limit logs each store error).
+ */
+let redisHealthy = true
+const noteRedisFailure = (err: unknown): void => {
+  redisDownUntil = Math.max(redisDownUntil, Date.now() + BREAKER_MS)
+  if (!redisHealthy) return
+  redisHealthy = false
+  const msg = err instanceof Error ? err.message : String(err)
+  console.warn(`[rate-limit] Redis unavailable (${msg}) — requests are allowed WITHOUT rate limits until it is back.`)
+}
+const noteRedisOk = (): void => {
+  if (redisHealthy) return
+  redisHealthy = true
+  console.warn('[rate-limit] Redis is back — rate limits active again.')
+}
+
+/** Counts as "no hits yet" → the request is allowed (fail open), exactly like passOnStoreError. */
+const openResponse = (): IncrementResponse => ({ totalHits: 0, resetTime: undefined })
+
+/** RedisStore that never throws: an unreachable Redis means "no rate limiting", never an outage. */
+class FailOpenRedisStore extends RedisStore {
+  override async init(options: Parameters<RedisStore['init']>[0]): Promise<void> {
+    try {
+      await super.init(options)
+    } catch (err) {
+      noteRedisFailure(err) // scripts are loaded again on the first increment
+    }
+  }
+
+  override async increment(key: string): Promise<IncrementResponse> {
+    if (Date.now() < redisDownUntil) return openResponse()
+    try {
+      const r = await super.increment(key)
+      noteRedisOk()
+      return r
+    } catch (err) {
+      noteRedisFailure(err)
+      return openResponse()
+    }
+  }
+
+  override async decrement(key: string): Promise<void> {
+    if (Date.now() < redisDownUntil) return
+    try {
+      await super.decrement(key)
+    } catch (err) {
+      noteRedisFailure(err)
+    }
+  }
+
+  override async resetKey(key: string): Promise<void> {
+    if (Date.now() < redisDownUntil) return
+    try {
+      await super.resetKey(key)
+    } catch (err) {
+      noteRedisFailure(err)
+    }
+  }
+}
+
 const makeRedisStore = (prefix: string): RedisStore =>
-  new RedisStore({
+  new FailOpenRedisStore({
     sendCommand: async (...args: string[]) => {
       // noUncheckedIndexedAccess: guard args[0] before use
       const command = args[0]

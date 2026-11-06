@@ -130,7 +130,7 @@ export const updateAnnotation = asyncHandler(
     const annotation = await Annotation.findOneAndUpdate(
       { _id: id, userId: req.user.userId },
       update,
-      { new: true },
+      { returnDocument: 'after' },
     )
 
     if (!annotation) {

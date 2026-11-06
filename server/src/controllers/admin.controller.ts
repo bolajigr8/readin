@@ -16,7 +16,15 @@ import {
   formatNaira,
   normalizePlansInput,
 } from '../services/billing.logic.js'
-import { paystackConfigured, paystackMode, publicBaseUrl, explainPaystackFailure, pingPaystack } from '../services/paystack.service.js'
+import {
+  paystackConfigured,
+  paystackMode,
+  publicBaseUrl,
+  explainPaystackFailure,
+  pingPaystack,
+  probeStartPayment,
+  describeBlock,
+} from '../services/paystack.service.js'
 import { errorResponse, successResponse } from '../utils/response.utils.js'
 import {
   FEATURE_KEYS,
@@ -517,14 +525,40 @@ export const listPayments = asyncHandler(async (req: Request, res: Response) => 
   )
 })
 
-/** POST /admin/billing/test — checks the Paystack key and the connection from THIS server. */
+/**
+ * POST /admin/billing/test — checks the Paystack key AND that a "start payment"
+ * request gets through from THIS server (the firewall once blocked only that one).
+ */
 export const testPaystack = async (_req: Request, res: Response): Promise<void> => {
   const r = await pingPaystack()
+  if (!r.ok) {
+    successResponse(res, {
+      ok: false,
+      status: r.status,
+      mode: paystackMode(),
+      message: explainPaystackFailure(r),
+      detail: `Key check: HTTP ${r.status} — ${r.message}${r.raw === undefined ? '' : ` — ${describeBlock(r)}`}`,
+    })
+    return
+  }
+  const probe = await probeStartPayment()
+  if (!probe.reachable) {
+    const p = probe.result
+    console.error('[payments] start-payment probe blocked:', p.status, p.message, describeBlock(p))
+    successResponse(res, {
+      ok: false,
+      status: p.status,
+      mode: paystackMode(),
+      message: `Your key works, but Paystack refuses "start payment" requests from this server, so users cannot pay right now. ${explainPaystackFailure(p)}`,
+      detail: `Start-payment check: HTTP ${p.status} — ${p.message}${p.raw === undefined ? '' : ` — ${describeBlock(p)}`}`,
+    })
+    return
+  }
   successResponse(res, {
-    ok: r.ok,
+    ok: true,
     status: r.status,
     mode: paystackMode(),
-    message: r.ok ? 'Connected. Paystack accepted the key.' : explainPaystackFailure(r),
-    detail: r.ok ? '' : `HTTP ${r.status} — ${r.message}`,
+    message: 'Connected. Paystack accepted the key, and "start payment" requests get through.',
+    detail: '',
   })
 }
