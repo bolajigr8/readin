@@ -67,12 +67,35 @@ const noteRedisOk = (): void => {
   console.warn('[rate-limit] Redis is back — rate limits active again.')
 }
 
+/**
+ * Startup grace: the TLS connection to Upstash can take a few seconds after boot. During that
+ * time the limiters let requests through quietly instead of logging a false "Redis unavailable".
+ */
+const STARTUP_GRACE_MS = Number(process.env['REDIS_STARTUP_GRACE_MS'] ?? '10000')
+const startedAt = Date.now()
+const stillConnecting = (): boolean =>
+  redisConnection.status !== 'ready' && Date.now() - startedAt < STARTUP_GRACE_MS
+
+/** Resolves when Redis is ready, or when the startup grace is over (whichever comes first). */
+const waitForStartup = (): Promise<void> =>
+  new Promise<void>((resolve) => {
+    if (!stillConnecting()) return resolve()
+    const done = (): void => {
+      clearTimeout(t)
+      redisConnection.off('ready', done)
+      resolve()
+    }
+    const t = setTimeout(done, Math.max(0, STARTUP_GRACE_MS - (Date.now() - startedAt)))
+    redisConnection.once('ready', done)
+  })
+
 /** Counts as "first hit" → the request is allowed (fail open). Must be ≥ 1: express-rate-limit 8 rejects 0 (ERR_ERL_INVALID_HITS). */
 const openResponse = (): IncrementResponse => ({ totalHits: 1, resetTime: undefined })
 
 /** RedisStore that never throws: an unreachable Redis means "no rate limiting", never an outage. */
 class FailOpenRedisStore extends RedisStore {
   override async init(options: Parameters<RedisStore['init']>[0]): Promise<void> {
+    await waitForStartup()
     try {
       await super.init(options)
     } catch (err) {
@@ -81,7 +104,7 @@ class FailOpenRedisStore extends RedisStore {
   }
 
   override async increment(key: string): Promise<IncrementResponse> {
-    if (Date.now() < redisDownUntil) return openResponse()
+    if (stillConnecting() || Date.now() < redisDownUntil) return openResponse()
     try {
       const r = await super.increment(key)
       noteRedisOk()
@@ -93,7 +116,7 @@ class FailOpenRedisStore extends RedisStore {
   }
 
   override async decrement(key: string): Promise<void> {
-    if (Date.now() < redisDownUntil) return
+    if (stillConnecting() || Date.now() < redisDownUntil) return
     try {
       await super.decrement(key)
     } catch (err) {
@@ -102,7 +125,7 @@ class FailOpenRedisStore extends RedisStore {
   }
 
   override async resetKey(key: string): Promise<void> {
-    if (Date.now() < redisDownUntil) return
+    if (stillConnecting() || Date.now() < redisDownUntil) return
     try {
       await super.resetKey(key)
     } catch (err) {

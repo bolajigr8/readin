@@ -153,6 +153,7 @@ const env = {
   PAYSTACK_BASE_URL: `http://127.0.0.1:${fakePort}/paystack`,
   UPSTASH_REDIS_URL: `redis://127.0.0.1:${deadRedisPort}`,
   REDIS_COMMAND_TIMEOUT_MS: '300',
+  REDIS_STARTUP_GRACE_MS: '0', // dead Redis on purpose: no startup grace, fail open straight away
   ADMIN_EMAILS: ADMIN_EMAIL,
   CONVERSION_ENABLED: 'false',
   CLOUDINARY_CLOUD_NAME: 'e2e',
