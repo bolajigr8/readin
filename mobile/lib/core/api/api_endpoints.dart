@@ -25,6 +25,7 @@ class ApiEndpoints {
   static const String libraryLocal = '/library/local';
   static const String featuresMe = '/features/me';
   static const String publicConfig = '/config/public';
+  static const String appVersion = '/app/version';
   static const String paymentsCheckout = '/payments/checkout';
   static const String billingStatus = '/billing/status';
   static const String billingTrial = '/billing/trial';

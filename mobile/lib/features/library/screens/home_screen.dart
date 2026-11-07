@@ -18,6 +18,7 @@ import '../../../widgets/loading_spinner.dart';
 import '../../../widgets/pressable_opacity.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../../billing/premium_reminder_banner.dart';
+import '../../update/update_widgets.dart';
 import '../../goals/widgets/reading_goal_card.dart';
 import '../data/models/book.dart';
 import '../providers/library_providers.dart';
@@ -111,6 +112,8 @@ class HomeScreen extends ConsumerWidget {
                         ],
                       ),
                     ),
+                    // A newer ReadIn version (S2; set in the admin → App versions)
+                    const UpdateBanner(),
                     // Premium ending / ended (S9.2; days set in the admin)
                     const PremiumReminderBanner(),
                     const SizedBox(height: 28),

@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 
+import '../../app/app_version.dart';
+
 import '../distribution.dart';
 import '../errors/app_exception.dart';
 import '../services/token_service.dart';
@@ -34,6 +36,9 @@ class ApiClient {
           'Accept': 'application/json',
           // Which version is calling (APK vs Google Play) — the server refuses Paystack from Play.
           'X-App-Distribution': kDistribution.wireName,
+          // Which app version is calling (S2; helps support and future compatibility checks).
+          'X-App-Version': kAppVersion,
+          'X-App-Build': '$kAppVersionCode',
         },
       ),
     );

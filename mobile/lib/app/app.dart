@@ -25,6 +25,8 @@ import '../features/library/utils/open_book.dart';
 import '../providers/theme_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_toast.dart';
+import '../features/update/update_provider.dart';
+import '../features/update/update_widgets.dart';
 
 /// Root widget. Besides the app shell it:
 ///  * wakes the (free-plan, sleeping) server when the app opens / returns,
@@ -59,6 +61,7 @@ class _ReadInAppState extends ConsumerState<ReadInApp> with WidgetsBindingObserv
     _incomingSub = NativeFiles.incoming.listen(_onIncoming);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       _wakeServer();
+      unawaited(ref.read(updateProvider.notifier).check()); // S2: newer version? (never blocks when offline)
       _onIncoming(await NativeFiles.takeIncoming()); // cold start via Share
     });
     _access.start();
@@ -78,6 +81,7 @@ class _ReadInAppState extends ConsumerState<ReadInApp> with WidgetsBindingObserv
     if (state == AppLifecycleState.resumed) {
       _wakeServer();
       _access.request(); // right away when the app comes back (at most every 15 s)
+      unawaited(ref.read(updateProvider.notifier).check()); // at most every 6 h (always while an update is required)
     }
   }
 
@@ -235,7 +239,7 @@ class _ReadInAppState extends ConsumerState<ReadInApp> with WidgetsBindingObserv
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
             onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-            child: child ?? const SizedBox.shrink(),
+            child: UpdateGate(router: router, child: child ?? const SizedBox.shrink()),
           ),
         ),
       ),
