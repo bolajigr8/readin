@@ -26,3 +26,7 @@ Branch `feat/s5-admin-team` (from main; `chore/site-release-1.0.1` + `chore/smal
   page; Support admin on /billing → friendly panel, menu Dashboard/Users/Guide) at 1280/390 px, no overflow/errors.
 - Michael after merge: (optional) Atlas backup → `npx tsx src/scripts/migrate-roles.ts` (dry run) on Render shell — not
   required: his ADMIN_EMAILS account is an owner automatically. Then add helpers on Team; testers via Users → Tester.
+
+## End of session (2026-11-07 evening)
+- Reported S5 to Michael with merge links (site-release-1.0.1, smaller-app, s5-admin-team). Michael shut down for the day.
+- NEXT.md "RESUME HERE" block lists his steps and the next-stage choices. Nothing half-done in code.

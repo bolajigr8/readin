@@ -1,7 +1,20 @@
 # NEXT — where we are right now (Claude Code keeps this current)
 
-**Updated:** 2026-11-07   **Current stage:** Group B — 1.0.1 built, S2 + S4 done, waiting for merge (order below).
-Latest log: `sessions/2026-11-07-release-s2-s4.md`.
+**Updated:** 2026-11-07 (end of day, Michael shut down)   **Current stage:** Group B — S2, S4, S9.2 merged; 1.0.2 built;
+S5 (admin team & roles) DONE on a branch. Latest log: `sessions/2026-11-07-s5-admin-team.md`.
+
+## RESUME HERE (2026-11-07 evening)
+Waiting for Michael's merge (any order):
+1. `chore/site-release-1.0.1` — website download button → v1.0.1 APK.
+2. `chore/smaller-app` — version 1.0.2+3, smaller APKs (obfuscate + split debug info, arm/arm64 universal). Files in
+   `mobile/build/release/1.0.2+3/`.
+3. `feat/s5-admin-team` — roles owner/admin/tester/user, Team page, Tester switch, can() on every admin route.
+Michael after merging: install `readin-1.0.2-arm64-v8a.apk` over 1.0.1 and run the S4 phone test list (fingerprint,
+update prompt, share import, reminders, read-aloud screen off, folder pick, volume keys) · GitHub release v1.0.2 →
+then Claude updates site/public/release.json · admin → App versions: add 1.0.2 (code 3) + publish · open admin → Team
+once · (optional) migrate-roles.ts after an Atlas backup · paste the Render `[client-ip] using …` line.
+Next stage choices (each needs one thing from Michael): S6 Firebase (create project) · S8.3 Play Billing (Play app,
+merchant profile, RevenueCat) · S9.1 refunds (refund policy) · S7.3 play-audit (needs nothing — can run next) · S10 QA.
 
 ## Done
 - S0, S1 (except S1.6 phone test), S8 two versions (merged). Release key + first signed APKs/AAB 1.0.0+1.
