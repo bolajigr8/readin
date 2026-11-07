@@ -1,0 +1,17 @@
+# 2026-11-07 — real client IP for rate limits, then S9.2 plan
+
+## Checked (Michael: "is there anything I haven't done")
+- All PRs merged (#12–#17). Site live with the 1.0.0 APK button; both APKs on GitHub match local SHA-256.
+- Redis WORKS (RateLimit-Remaining counts down over IPv4).
+
+## Found: rate-limit key = a proxy IP, not the user's
+- Probing /config/public: counters keep restarting (`197/840` after `194/831`) → `req.ip` with `trust proxy 1` is one of
+  several Render/Cloudflare edge addresses. Effect: many users share one counter (200/15 min general, 10 failed logins)
+  → innocent users could get 429 once traffic grows; admin audit stores the proxy IP.
+- Plan (branch `fix/real-client-ip`): `utils/clientIp.ts` — in production prefer `cf-connecting-ip` (set by Cloudflare,
+  which fronts onrender.com, overwrites any client value) → `true-client-ip` → `req.ip`; validated with `net.isIP`.
+  All limiters use `keyGenerator: ipKeyGenerator(clientIp(req))` (IPv6 /56 like the default); audit uses it too.
+  One startup-time log line says WHICH source is used (never the IP). Outside production: `req.ip` only (no spoofing).
+- Done: typecheck ✅ lint 0 errors ✅ unit (new tests/client-ip.test.mjs 6) ✅ e2e 29/29 ✅ (e2e = non-production → req.ip path).
+- NOT tested: real Render headers. After deploy the log must show `[client-ip] using cf-connecting-ip …`; then re-probe:
+  RateLimit-Remaining must count down steadily (no restarts at 199/900).
