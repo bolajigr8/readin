@@ -272,7 +272,7 @@ export function RemindersCard({ billing, onSaved }: { billing: BillingConfig; on
               </p>
             )}
             {steps.map((s, i) => (
-              <div key={i} className="grid gap-3 rounded-lg border p-4">
+              <div key={i} className="grid min-w-0 gap-3 rounded-lg border p-4">
                 <div className="flex flex-wrap items-end gap-3">
                   {s.when !== 'on' && (
                     <div className="grid w-24 gap-1.5">
@@ -280,7 +280,7 @@ export function RemindersCard({ billing, onSaved }: { billing: BillingConfig; on
                       <Input inputMode="numeric" value={s.days} onChange={(e) => update(i, { days: e.target.value })} />
                     </div>
                   )}
-                  <div className="grid min-w-44 flex-1 gap-1.5">
+                  <div className="grid min-w-40 flex-1 gap-1.5">
                     <Label>When</Label>
                     <NativeSelect value={s.when} onChange={(e) => update(i, { when: e.target.value as When })}>
                       <option value="before">before Premium ends</option>
@@ -318,7 +318,7 @@ export function RemindersCard({ billing, onSaved }: { billing: BillingConfig; on
                 <Plus /> Add a reminder day
               </Button>
               <Button variant="outline" size="sm" onClick={() => setSteps(RECOMMENDED.map(toDraft))}>
-                Use recommended (5 &amp; 2 days before, on the day, 3 days after)
+                Use recommended days
               </Button>
             </div>
           </>
@@ -335,6 +335,9 @@ export function RemindersCard({ billing, onSaved }: { billing: BillingConfig; on
         )}
 
         <Explain>
+          <p>
+            <strong>Recommended days:</strong> 5 and 2 days before Premium ends, on the day it ends, and 3 days after.
+          </p>
           <p>
             <strong>Banner in the app:</strong> a friendly message on the Home screen with a &ldquo;Renew&rdquo; button, shown from the
             first reminder day until a week after the last one.
