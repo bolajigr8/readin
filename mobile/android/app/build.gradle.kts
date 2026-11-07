@@ -156,6 +156,8 @@ kotlin {
 dependencies {
     // FileProvider / NotificationCompat used by MainActivity + ReadAloudService
     implementation("androidx.core:core-ktx:1.13.1")
+    // AppCompat themes (styles.xml): local_auth's fingerprint dialog crashes on Android 8 and older without them (S4)
+    implementation("androidx.appcompat:appcompat:1.7.1")
 }
 
 flutter {

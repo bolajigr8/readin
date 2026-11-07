@@ -36,9 +36,9 @@ Order matters: S0 → S1 → S2 → S3 are needed to start acquiring users safel
 - [ ] S3.4 [M] Create the Vercel project (Root Directory `site`), host the APK (GitHub Releases `readin-releases`), (optional) buy a domain.
 
 ## S4 — Biometric sign-in — see BIOMETRIC_PLAN.md ⚠ (touches MainActivity + auth flow)
-- [ ] S4.1 [C] `local_auth`; `MainActivity` → `FlutterFragmentActivity` (required by the plugin); manifest `USE_BIOMETRIC`; `BiometricService` interface + fake for tests.
-- [ ] S4.2 [C] Profile switch "Unlock with fingerprint / face" (ON requires a successful scan first); lock screen on cold start and after N minutes in background; 3 failures or "Use password instead" → sign out → sign-in screen. Server unaffected; password never stored.
-- [ ] S4.3 [C] Tests (provider logic with fake service, lifecycle timing) + manual device test list.
+- [x] S4.1 [C] (done 2026-11-07: local_auth 3.0.2, FlutterFragmentActivity, appcompat themes; debug APK builds) `local_auth`; `MainActivity` → `FlutterFragmentActivity` (required by the plugin); manifest `USE_BIOMETRIC`; `BiometricService` interface + fake for tests.
+- [x] S4.2 [C] (done 2026-11-07: 5 min relock, 3 failures → sign out) Profile switch "Unlock with fingerprint / face" (ON requires a successful scan first); lock screen on cold start and after N minutes in background; 3 failures or "Use password instead" → sign out → sign-in screen. Server unaffected; password never stored.
+- [x] S4.3 [C] (done 2026-11-07: test/features/app_lock_test.dart 9; manual phone list in the session log) Tests (provider logic with fake service, lifecycle timing) + manual device test list.
 
 ## S5 — Admin team & roles — see ADMIN_ROLES_PLAN.md ⚠ (DB schema + auth)
 - [ ] S5.1 [C] Server: roles `user | tester | admin | owner`, `permissions[]`, migration (existing `role:'admin'` + `ADMIN_EMAILS` → `owner`), `requirePermission()`, last-owner protection, audit entries, session revocation on role change. `ADMIN_EMAILS` stays as *break-glass owner bootstrap* only.

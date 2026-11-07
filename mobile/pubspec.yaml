@@ -44,6 +44,7 @@ dependencies:
   # Audio
   flutter_tts: ^4.0.2
   just_audio: ^0.9.40
+  local_auth: ^3.0.2
 
 dev_dependencies:
   flutter_test:

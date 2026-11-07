@@ -25,6 +25,8 @@ import '../features/library/utils/open_book.dart';
 import '../providers/theme_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_toast.dart';
+import '../features/security/app_lock.dart';
+import '../features/security/lock_widgets.dart';
 import '../features/update/update_provider.dart';
 import '../features/update/update_widgets.dart';
 
@@ -77,6 +79,7 @@ class _ReadInAppState extends ConsumerState<ReadInApp> with WidgetsBindingObserv
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    ref.read(appLockProvider.notifier).onLifecycle(state); // S4: lock again after 5 min away
     _access.setForeground(state == AppLifecycleState.resumed);
     if (state == AppLifecycleState.resumed) {
       _wakeServer();
@@ -239,7 +242,7 @@ class _ReadInAppState extends ConsumerState<ReadInApp> with WidgetsBindingObserv
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
             onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-            child: UpdateGate(router: router, child: child ?? const SizedBox.shrink()),
+            child: AppLockGate(child: UpdateGate(router: router, child: child ?? const SizedBox.shrink())),
           ),
         ),
       ),

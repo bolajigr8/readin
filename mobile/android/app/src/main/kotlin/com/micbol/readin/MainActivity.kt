@@ -15,7 +15,7 @@ import android.provider.OpenableColumns
 import android.provider.Settings
 import android.view.KeyEvent
 import androidx.core.content.FileProvider
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
@@ -30,7 +30,8 @@ import java.util.concurrent.atomic.AtomicLong
  *  - folder scan, "Open with…", share file (readin/files)
  *  - read-aloud notification + controls    (readin/readaloud, readin/readaloud_events)
  */
-class MainActivity : FlutterActivity() {
+// FlutterFragmentActivity (not FlutterActivity): required by local_auth for the fingerprint/face dialog (S4).
+class MainActivity : FlutterFragmentActivity() {
     private val main = Handler(Looper.getMainLooper())
     private val io = Executors.newSingleThreadExecutor()
     private val counter = AtomicLong(System.currentTimeMillis())
