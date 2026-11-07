@@ -3,7 +3,7 @@
 import { createContext, useContext, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { BookOpen, CircleHelp, CreditCard, LayoutDashboard, Loader2, LogOut, RefreshCw, ScrollText, SlidersHorizontal, Users } from 'lucide-react'
+import { BookOpen, CircleHelp, CreditCard, LayoutDashboard, Loader2, LogOut, PackageCheck, RefreshCw, ScrollText, SlidersHorizontal, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useApi } from '@/hooks/use-api'
@@ -28,6 +28,7 @@ const NAV = [
   { href: '/users', label: 'Users', icon: Users },
   { href: '/features', label: 'Features', icon: SlidersHorizontal },
   { href: '/billing', label: 'Billing', icon: CreditCard },
+  { href: '/releases', label: 'App versions', icon: PackageCheck },
   { href: '/audit', label: 'Audit log', icon: ScrollText },
   { href: '/guide', label: 'Guide', icon: CircleHelp },
 ]

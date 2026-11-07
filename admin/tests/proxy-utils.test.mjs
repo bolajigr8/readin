@@ -9,7 +9,7 @@ const t = (name, fn) => { fn(); n++; console.log('ok -', name) }
 const id = 'a'.repeat(24)
 
 t('allows exactly the admin API paths', () => {
-  for (const p of ['stats', 'audit', 'config', 'config/features/habits', 'billing', 'billing/test', 'billing/reminders/run', 'payments', `users/${id}/verify`, 'users', `users/${id}`,
+  for (const p of ['stats', 'audit', 'config', 'config/features/habits', 'billing', 'billing/test', 'billing/reminders/run', 'payments', 'releases', `releases/${id}`, `users/${id}/verify`, 'users', `users/${id}`,
     `users/${id}/features/habits/grant`, `users/${id}/features/habits/reset-trial`]) {
     assert.equal(targetPath('/api/admin/' + p, 'GET'), p, p)
   }

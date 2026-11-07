@@ -162,3 +162,22 @@ export interface PaymentsPage {
   page: number
   limit: number
 }
+
+// ── app releases (S2) ─────────────────────────────────────────────────────────
+
+export interface AppReleaseRow {
+  id: string
+  /** direct = APK from the website, play = Google Play */
+  channel: 'direct' | 'play'
+  version: string
+  versionCode: number
+  downloadUrl: string
+  sha256: string
+  sizeBytes: number
+  notes: string[]
+  mandatory: boolean
+  minSupportedVersionCode: number
+  published: boolean
+  releasedAt: string | null
+  createdAt: string
+}
