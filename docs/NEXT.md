@@ -1,7 +1,7 @@
 # NEXT — where we are right now (Claude Code keeps this current)
 
-**Updated:** 2026-11-07   **Current stage:** S9.2 Premium controls — A merged (#19); B, C + 2 admin fixes pushed, waiting
-for merge (order below). Latest log: `sessions/2026-11-07-client-ip-and-s9.md`.
+**Updated:** 2026-11-07   **Current stage:** Group B — 1.0.1 built, S2 + S4 done, waiting for merge (order below).
+Latest log: `sessions/2026-11-07-release-s2-s4.md`.
 
 ## Done
 - S0, S1 (except S1.6 phone test), S8 two versions (merged). Release key + first signed APKs/AAB 1.0.0+1.
@@ -12,12 +12,13 @@ for merge (order below). Latest log: `sessions/2026-11-07-client-ip-and-s9.md`.
 - Redis (Upstash): WORKING since 2026-11-06 (fix/redis-upstash merged; live RateLimit-Remaining counts down). `fix/redis-startup-race`
   removes the false "Redis unavailable" line at boot — waiting for merge.
 
-## Waiting for Michael's merge (any order; each was merged with main before pushing)
-- `feat/s9-app-premium` (app: hooks, trial card, Home reminder banner, Profile e-mail switch) → then a new APK/AAB build.
-- `feat/s9-site-prices` (website Premium section + server CORS for /config/public).
-- `fix/admin-billing-phone-width` (Billing page fits phones) · `chore/admin-next-upgrade` (Next 16.4.3, security).
-- Open: Render log line `[client-ip] using …` (Michael to paste) · iPhone = new stage S11 (Apple $99/yr, Mac or Codemagic,
-  Apple in-app purchase, TestFlight) — Michael to decide · free trial days (admin switch, default off).
+## Waiting for Michael's merge — IN THIS ORDER
+1. `chore/release-1.0.1` (version 1.0.1+2; files in mobile/build/release/1.0.1+2/, checksums in RELEASE-NOTES).
+2. `feat/s2-update-prompt` (server /app/version + admin "App versions" + app banner / required-update screen; contains 1).
+3. `feat/s4-biometric-unlock` (fingerprint/face; contains 1 + 2). Then I build 1.0.2 (S2 + S4) for the phone test.
+- Michael: GitHub release v1.0.1 (upload 1.0.1 APKs) → I update site/public/release.json; after S2 is live add the
+  version in admin → App versions. Phone test list for S4 is in the session log (MainActivity changed).
+- Open: Render log `[client-ip] using …` · iPhone web app (S11) parked by Michael (iPhones can't use Google Play).
 
 ## Next 3 steps
 1. ✅ S7.1 built — Michael: merge `feat/s7-account-deletion` + deploy Render; try Profile → Delete account with a TEST account.
