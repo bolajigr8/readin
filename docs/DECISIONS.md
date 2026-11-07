@@ -58,7 +58,7 @@
     Cloudflare Pages), with `motion` animations, both light and dark mode + a theme switch. New packages (site only): next
     16.4.3, react/react-dom 19.3.0, motion, geist, lucide-react; dev: tailwindcss 4, @tailwindcss/turbopack, typescript,
     eslint + eslint-config-next 16.4.3. Next 16.4.0 is flagged with a security vulnerability → the site uses 16.4.3; the
-    ADMIN still uses 16.4.0 → upgrade it on its own branch (ask Michael).
+    ADMIN used 16.4.0 → upgraded to 16.4.3 on `chore/admin-next-upgrade` (2026-11-07, Michael: "proceed with all").
 20. **Premium prices (2026-11-07, Michael)**: monthly **₦700** (70 000 kobo); yearly **₦7,000** (700 000 kobo) = 10 months' (changed from ₦800/₦8,000 the same day)
     price, "2 months free" (~17 % off); hook "less than ₦24 a day". Michael wants nearly everything controlled from the admin (S9.2). Same prices for Paystack (admin → Billing plans) and Google Play
     subscriptions (Play Console, set when Play Billing is built). Live: https://readin.micbol.org on Cloudflare Pages
