@@ -20,6 +20,7 @@ import {
   formatNaira,
   normalizePlansInput,
   normalizeReminderSteps,
+  planHooks,
 } from '../services/billing.logic.js'
 import {
   paystackConfigured,
@@ -460,6 +461,8 @@ const billingSchema = z
 
 const billingView = async () => ({
   billing: await getBillingConfig(),
+  /** What users see under each active plan, calculated by the server (same as the app). */
+  preview: planHooks(await getBillingConfig()),
   paystack: {
     configured: paystackConfigured(),
     mode: paystackMode(),

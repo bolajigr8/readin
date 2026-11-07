@@ -24,3 +24,10 @@ User += `premiumKind` ('paid'|'trial'|'gift'|null), `premiumTrialUsedAt`, `premi
 `emailReminders` (default true) — additive, no migration. New `/api/v1/billing`: GET /status, POST /trial (once per
 account, atomic), PATCH /reminders {email}. Hourly in-process sweep e-mails due reminders (exactly once).
 Admin Billing page: Free trial, Reminders, Hook text sections. Prices ₦700/30d + ₦7,000/365d are entered by Michael.
+- Part A DONE: server (commit a62cfc4 + admin preview) and admin Billing page: new cards "Premium screen wording",
+  "Free Premium trial", "Premium reminders" (+ "Send due reminders now"), plan rows show server-calculated hooks,
+  quick-add buttons now ₦700/30 d and ₦7,000/365 d. Proxy ALLOWED + test: `billing/reminders/run`.
+  Checks: server typecheck/lint/unit (35 new)/e2e 32 ✅; admin tsc ✅ lint 0 errors ✅ build ✅ proxy test ✅.
+  NOT done: admin screenshots (needs a local server — ask Michael first). Admin Next 16.4.0 security warning at build
+  (known, DECISIONS #19) → separate upgrade branch, ask Michael.
+- Next: part B (app: Premium screen hooks + trial button, Home banner, Profile switch), part C (site prices).

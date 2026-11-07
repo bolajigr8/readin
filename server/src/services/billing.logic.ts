@@ -210,6 +210,16 @@ export const publicBilling = (cfg: BillingConfig) => {
   }
 }
 
+/** The hook texts of every ACTIVE plan (admin preview; same texts the app gets). */
+export const planHooks = (cfg: BillingConfig): { id: string; perDayText: string; savingsText: string }[] => {
+  const active = cfg.plans.filter((p) => p.active)
+  return active.map((p) => ({
+    id: p.id,
+    perDayText: cfg.marketing.showPerDay ? perDayText(p.priceKobo, p.durationDays) : '',
+    savingsText: cfg.marketing.showSavings ? savingsText(p, active) : '',
+  }))
+}
+
 /** Whole months in a plan (30 → 1, 365 → 12); 0 for plans shorter than ~4 weeks. */
 export const planMonths = (durationDays: number): number => (durationDays >= 28 ? Math.round(durationDays / 30.4) : 0)
 

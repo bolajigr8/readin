@@ -1,7 +1,7 @@
 # NEXT — where we are right now (Claude Code keeps this current)
 
-**Updated:** 2026-11-06   **Current stage:** Group A coding complete. Waiting for merge: `feat/s3-site-nextjs` (website as Next.js)
-and `fix/redis-upstash` (Redis TLS + log fixes). Latest log: `sessions/2026-11-06-redis-fix.md`.
+**Updated:** 2026-11-07   **Current stage:** S9.2 Premium controls — part A (server + admin) on `feat/s9-premium-controls`
+(waiting for merge); next part B (app), part C (site). Latest log: `sessions/2026-11-07-client-ip-and-s9.md`.
 
 ## Done
 - S0, S1 (except S1.6 phone test), S8 two versions (merged). Release key + first signed APKs/AAB 1.0.0+1.
@@ -26,7 +26,7 @@ S2 update prompt, S4 biometrics, S6 Firebase, S5 roles, S9, Paystack phone-side 
 - NOT uploading to Play yet (Michael, 2026-11-06) — remind when Group A is done: create app (Free, App), PEPK "use my own key".
 - Later: merchant profile (USD domiciliary account), monthly+yearly subscriptions, RevenueCat account; Vercel site project;
   domain?; Resend domain verification; Firebase project; Paystack live keys.
-- Decisions pending: free trial for Premium (yes/no, days). Prices decided: ₦800/month, ₦8,000/year (DECISIONS #20).
+- Decisions pending: free trial for Premium (yes/no, days). Prices: ₦700/month, ₦7,000/year (Michael 2026-11-07; enter them in admin → Billing).
 - Website LIVE 2026-11-07: readin.micbol.org (Cloudflare Pages, auto-deploys from main). APK hosting: github.com/bolajigr8/readin-releases (tag v1.0.0) → then fill site/public/release.json.
 
 ## NEW 2026-11-06: Michael has a Google Play Console account → Play is the main goal (APK stays)
