@@ -49,7 +49,7 @@ export default function BillingPage() {
       ) : !view.data ? (
         <Skeleton className="h-64 w-full" />
       ) : (
-        <div className="grid gap-4">
+        <div className="grid gap-4 [&>*]:min-w-0">
           <PaymentsSwitch view={view.data} habitsFree={config.data?.features['habits']?.freeForAll === true} habitsOn={config.data?.features['habits']?.enabled !== false} onChanged={reloadAll} />
           <PaystackCard paystack={view.data.paystack} />
           {/* remount when the saved plans change so the form starts from them */}

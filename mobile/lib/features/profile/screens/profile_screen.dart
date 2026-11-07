@@ -1,5 +1,6 @@
 import 'package:intl/intl.dart';
 import '../../billing/billing_providers.dart';
+import '../../billing/reminder_emails_row.dart';
 import '../../../widgets/app_toast.dart';
 import '../../shelves/widgets/shelf_widgets.dart';
 import 'package:flutter/foundation.dart';
@@ -243,8 +244,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 ? 'Unlimited books and every Premium feature'
                                 : 'Active until ${DateFormat.yMMMMd().format(user!.premiumUntil!.toLocal())}',
                             onTap: () => context.push(AppRoutes.upgrade),
-                            isLast: true,
-                          )
+                          ),
+                        if (isPremium) const ReminderEmailsRow()
                         else ...[
                           SettingsRow(
                             icon: Ionicons.flash_outline,
@@ -301,6 +302,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               ],
                             ),
                           ),
+                          // had Premium before → may still get "come back" reminders
+                          if (user?.premiumUntil != null) const ReminderEmailsRow(),
                         ],
                       ],
                     ),

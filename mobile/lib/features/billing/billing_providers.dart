@@ -70,6 +70,25 @@ class BillingApi {
         parser: (d) => AuthUser.fromJson(Map<String, dynamic>.from((d as Map)['user'] as Map)),
       );
 
+  /// Trial, reminder switch and Premium kind (S9.2).
+  Future<ApiResult<BillingStatus>> status() => _api.get<BillingStatus>(
+        ApiEndpoints.billingStatus,
+        parser: (d) => BillingStatus.fromJson(Map<String, dynamic>.from(d as Map)),
+      );
+
+  /// Starts the one free Premium trial of this account.
+  Future<ApiResult<BillingStatus>> startTrial() => _api.post<BillingStatus>(
+        ApiEndpoints.billingTrial,
+        parser: (d) => BillingStatus.fromJson(Map<String, dynamic>.from(d as Map)),
+      );
+
+  /// Profile switch "Premium reminder e-mails".
+  Future<ApiResult<void>> setEmailReminders(bool on) => _api.patch<void>(
+        ApiEndpoints.billingReminders,
+        data: {'email': on},
+        parser: (_) {},
+      );
+
   Future<ApiResult<void>> resendVerification(String email) => _api.post<void>(
         ApiEndpoints.resendVerification,
         data: {'email': email},
@@ -103,3 +122,10 @@ Future<void> _refreshCurrentUser(Ref ref) async {
               ),
       );
 }
+
+/// The signed-in user's trial / reminder settings from the server (null = unknown: offline or signed out).
+/// `ref.invalidate(billingStatusProvider)` reloads it.
+final billingStatusProvider = FutureProvider.autoDispose<BillingStatus?>((ref) async {
+  if (!ref.watch(authProvider).isAuthenticated) return null;
+  return (await ref.read(billingApiProvider).status()).dataOrNull;
+});

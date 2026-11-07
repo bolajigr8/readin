@@ -94,6 +94,17 @@ class ApiClient {
         parser,
       );
 
+  Future<ApiResult<T>> patch<T>(
+    String path, {
+    Object? data,
+    DataParser<T>? parser,
+    Options? options,
+  }) =>
+      _run<T>(
+        () => _dio.patch<dynamic>(path, data: data, options: options),
+        parser,
+      );
+
   Future<ApiResult<T>> delete<T>(
     String path, {
     Object? data,

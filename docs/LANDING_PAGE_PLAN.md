@@ -15,6 +15,10 @@
 > * Gotchas: Links use `prefetch={false}` (Next 16.4 static export writes segment-prefetch files at a different path than
 >   the client asks for → 404s); the theme class is set by an inline script before paint; `<noscript>` shows the
 >   scroll-in sections when JavaScript is off; no fake reviews or invented numbers.
+> * **Prices section (S9.2, 2026-11-07)**: `components/pricing.tsx` fetches `/config/public` WHILE BUILDING (force-cache +
+  `?build=<time>`; Next refuses no-store in a static page) and `pricing-live.tsx` refreshes it in the browser (CSP
+  `connect-src` allows the API). API unreachable → build-time prices stay; payments off → section hidden. `SITE_PRICES=off`
+  skips the build fetch. Browser tests answer the API themselves (`apiReply` in `tool/site_browser.mjs`).
 > * **Cloudflare (2026-11-07): use PAGES** (Create application → bottom link *Looking to deploy Pages? Get started* → Import Git):
   root directory `site`, preset *Next.js (Static HTML Export)*, build `pnpm build`, output `out`, `NODE_VERSION=22`; custom domain
   `readin.micbol.org` = one CNAME at Spaceship (DNS stays at Spaceship; Resend records untouched). Pages ignores `wrangler.jsonc`.

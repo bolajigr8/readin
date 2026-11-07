@@ -81,8 +81,27 @@ const test = async (name, fn) => {
   }
 }
 
+// The live API is never called by these tests: its public config is answered here (prices section).
+const PRICES_ON = {
+  success: true,
+  data: {
+    billing: {
+      enabled: true,
+      trialDays: 7,
+      plans: [
+        { id: 'monthly', name: 'Monthly', priceKobo: 70000, durationDays: 30, badge: '', perDayText: 'less than ₦24 a day', savingsText: '' },
+        { id: 'yearly', name: 'Yearly', priceKobo: 700000, durationDays: 365, badge: 'Best value', perDayText: 'less than ₦20 a day', savingsText: '2 months free · save ₦1,400' },
+      ],
+    },
+  },
+}
+let apiReply = PRICES_ON
+
 const visit = async (pathName, colorScheme) => {
   const ctx = await browser.newContext({ viewport: { width: 360, height: 740 }, colorScheme, deviceScaleFactor: 2 })
+  await ctx.route('https://readin-ehzw.onrender.com/**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(apiReply) }),
+  )
   const page = await ctx.newPage()
   const problems = []
   page.on('console', (m) => {
@@ -172,6 +191,35 @@ await test('unknown address shows the 404 page', async () => {
     if (v.res.status() !== 404) throw new Error(`HTTP ${v.res.status()}`)
     if (!(await v.page.content()).includes('This page does not exist')) throw new Error('not the 404 page')
   } finally {
+    await v.ctx.close()
+  }
+})
+
+await test('prices: the live admin prices show with the per-day hook, savings and trial', async () => {
+  apiReply = PRICES_ON
+  const v = await visit('/', 'light')
+  try {
+    const sec = v.page.getByTestId('pricing')
+    await sec.scrollIntoViewIfNeeded()
+    await v.page.waitForFunction(() => document.querySelector('[data-testid="pricing"]')?.textContent?.includes('₦7,000'))
+    const text = await sec.textContent()
+    for (const want of ['₦700', '₦7,000', 'less than ₦24 a day', '2 months free · save ₦1,400', 'free for 7 days']) {
+      if (!text.includes(want)) throw new Error(`pricing misses "${want}"`)
+    }
+    if (v.problems.length) throw new Error(v.problems.join(' | '))
+  } finally {
+    await v.ctx.close()
+  }
+})
+
+await test('prices: payments switched off in the admin → the section disappears', async () => {
+  apiReply = { success: true, data: { billing: { enabled: false, plans: [] } } }
+  const v = await visit('/', 'light')
+  try {
+    await v.page.waitForTimeout(300)
+    if ((await v.page.getByTestId('pricing').count()) !== 0) throw new Error('pricing still shown with payments off')
+  } finally {
+    apiReply = PRICES_ON
     await v.ctx.close()
   }
 })
