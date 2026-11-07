@@ -1,3 +1,5 @@
+import type { PremiumReminderInput } from './templates.js'
+
 /**
  * IEmailProvider — contract that every email provider must satisfy.
  *
@@ -24,4 +26,6 @@ export interface IEmailProvider {
     paidAt: Date
     premiumUntil: Date
   }): Promise<void>
+  /** Premium ending / ended reminder (S9.2). */
+  sendPremiumReminderEmail(input: { to: string } & PremiumReminderInput): Promise<void>
 }

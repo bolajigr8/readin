@@ -22,6 +22,8 @@ import syncRouter from './routes/sync.routes.js';
 import adminRouter from './routes/admin.routes.js';
 import configRouter from './routes/config.routes.js';
 import paymentsRouter from './routes/payments.routes.js';
+import billingRouter from './routes/billing.routes.js';
+import { startPremiumReminderScheduler } from './services/premiumReminders.service.js';
 import pagesRouter from './routes/pages.routes.js';
 import { notFoundHtml } from './controllers/pages.controller.js';
 
@@ -110,6 +112,7 @@ app.use('/api/v1/progress', progressRouter);
 app.use('/api/v1/webhooks', webhooksRouter);
 app.use('/api/v1/config', configRouter);
 app.use('/api/v1/payments', paymentsRouter);
+app.use('/api/v1/billing', syncLimiter, billingRouter);
 app.use('/api/v1/features', syncLimiter, featuresRouter);
 app.use('/api/v1/sync', syncLimiter, syncRouter);
 app.use('/api/v1/admin', adminLimiter, adminRouter);
@@ -141,6 +144,9 @@ const start = async (): Promise<void> => {
   });
 
   await connectDB();
+
+  // Premium ending/ended reminder e-mails (hourly; PREMIUM_REMINDERS_INTERVAL_MS=0 switches it off).
+  startPremiumReminderScheduler();
 
   // Conversion is ON HOLD by default. Set CONVERSION_ENABLED=true to start it.
   if (process.env['CONVERSION_ENABLED'] === 'true') {

@@ -7,6 +7,7 @@ import {
   listPayments,
   setBilling,
   testPaystack,
+  runRemindersNow,
   verifyUserEmail,
   getConfig,
   getStats,
@@ -33,6 +34,7 @@ router.put('/config/features/:key', setFeatureConfig)
 router.get('/billing', getBilling)
 router.put('/billing', setBilling)
 router.post('/billing/test', testPaystack)
+router.post('/billing/reminders/run', runRemindersNow)
 router.get('/payments', listPayments)
 
 router.get('/users', listUsers)

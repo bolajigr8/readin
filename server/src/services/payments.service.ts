@@ -78,6 +78,7 @@ export const settlePayment = async (reference: string): Promise<PaymentOutcome> 
       user.plan = 'premium'
       user.premiumUntil = until
       user.premiumEventAt = now
+      user.premiumKind = 'paid'
       await user.save()
       await Payment.updateOne({ _id: claimed._id }, { $set: { premiumUntil: until } })
 

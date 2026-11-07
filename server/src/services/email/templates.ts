@@ -203,3 +203,58 @@ ${row('Reference', `<span style="font-family:Consolas,Menlo,monospace;font-size:
     text: `Thank you! Payment received.\n\nPlan: ${r.planName}\nAmount: ${r.amountText}\nDate: ${dateText(r.paidAt)}\nPremium active until: ${dateText(r.premiumUntil)}\nReference: ${r.reference}\n\nPayments are processed securely by Paystack.`,
   }
 }
+
+export interface PremiumReminderInput {
+  name: string
+  /** Days relative to the end of Premium: -5 = five days before, 0 = today, 3 = three days ago. */
+  offsetDays: number
+  kind: 'paid' | 'trial' | 'gift' | null
+  premiumUntil: Date
+  /** e.g. "Premium is ₦700 a month — less than ₦24 a day." (empty = no price line) */
+  offer: string
+}
+
+/** Kind reminder that Premium is ending / has ended. Plain words, no pressure. */
+export const premiumReminderEmail = (r: PremiumReminderInput): Rendered => {
+  const what = r.kind === 'trial' ? 'free Premium trial' : r.kind === 'gift' ? 'free Premium' : 'ReadIn Premium'
+  const when = dateText(r.premiumUntil)
+  const days = Math.abs(r.offsetDays)
+  const plural = days === 1 ? 'day' : 'days'
+  let subject: string
+  let title: string
+  let line: string
+  if (r.offsetDays < 0) {
+    subject = `Your ${what} ends in ${days} ${plural}`
+    title = `${days} ${plural} of Premium left`
+    line = `Your ${what} ends on <strong>${esc(when)}</strong>. Renew before then and the new time is simply added on — you lose nothing.`
+  } else if (r.offsetDays === 0) {
+    subject = `Your ${what} ends today`
+    title = 'Premium ends today'
+    line = `Your ${what} ends today (${esc(when)}). Renew now to keep unlimited books and every Premium feature without a break.`
+  } else {
+    subject = 'We miss you on ReadIn Premium'
+    title = 'Come back to Premium'
+    line = `Your ${what} ended on ${esc(when)}. Your books, notes and highlights are all still here — renew any time to unlock everything again.`
+  }
+  const offerHtml = r.offer ? `<p style="margin:0 0 16px 0;"><strong style="color:${INK};">${esc(r.offer)}</strong></p>` : ''
+  return {
+    subject,
+    html: layout({
+      preheader: subject,
+      title,
+      body: `<p style="margin:0 0 16px 0;">Hi ${first(r.name)},</p>
+<p style="margin:0 0 16px 0;">${line}</p>
+${offerHtml}<p style="margin:0;">To renew, open <strong style="color:${INK};">ReadIn &rarr; Profile &rarr; Premium</strong>.</p>`,
+      after: 'Don&rsquo;t want these reminders? Turn them off in ReadIn &rarr; Profile &rarr; Premium reminder e-mails.',
+    }),
+    text: `Hi ${(r.name || 'there').split(' ')[0]},
+
+${line.replace(/<[^>]+>/g, '')}
+${r.offer ? `
+${r.offer}
+` : ''}
+To renew, open ReadIn → Profile → Premium.
+
+Don't want these reminders? Turn them off in ReadIn → Profile → Premium reminder e-mails.`,
+  }
+}
