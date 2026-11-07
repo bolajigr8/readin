@@ -72,7 +72,16 @@ void main(List<String> args) {
     // Keep the rest of the file (and its line endings) exactly as it was.
     final updated = text.replaceRange(m.start, m.end, 'version: $after');
     file.writeAsStringSync(updated);
+    // The app needs its own version to ask the server "is there a newer one?" (S2).
+    File('lib/app/app_version.dart').writeAsStringSync(appVersionDart('$major.$minor.$patch', build));
   }
   stdout.writeln('${dryRun ? '(dry run) ' : ''}version $before -> $after '
       '(versionCode $build)');
 }
+
+/// Contents of lib/app/app_version.dart (kept in step with pubspec.yaml).
+String appVersionDart(String version, int code) => """// The version of THIS build — written by `dart run tool/bump_version.dart …` together with pubspec.yaml.
+// Never edit by hand (test/app_version_test.dart fails if it differs from pubspec.yaml).
+const String kAppVersion = '$version';
+const int kAppVersionCode = $code;
+""";

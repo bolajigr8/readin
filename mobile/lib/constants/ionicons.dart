@@ -46,6 +46,7 @@ class Ionicons {
   static const IconData document_text_outline = Icons.description_outlined;
   static const IconData eye_off_outline = Icons.visibility_off_outlined;
   static const IconData eye_outline = Icons.visibility_outlined;
+  static const IconData finger_print = Icons.fingerprint;
   static const IconData flash_outline = Icons.flash_on_outlined;
   static const IconData funnel_outline = Icons.filter_list;
   static const IconData gift_outline = Icons.card_giftcard;

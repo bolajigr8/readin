@@ -9,6 +9,8 @@
     <!-- MANAGE_EXTERNAL_STORAGE ("On this phone" whole-device scan) is declared ONLY in
          src/direct/AndroidManifest.xml — Google Play does not allow it for a reading app. -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
+    <!-- Fingerprint / face unlock (S4, local_auth). Normal permission: no prompt, allowed on Google Play. -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
     <queries>
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE"/>

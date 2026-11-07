@@ -158,6 +158,9 @@ Requested by the **Play** version (merged manifest checked 2026-11-06 — all "n
 `INTERNET`, `ACCESS_NETWORK_STATE`, `POST_NOTIFICATIONS` (reminders + read-aloud controls), `RECEIVE_BOOT_COMPLETED`
 (re-arm reading reminders after a restart), `WAKE_LOCK`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PLAYBACK`
 (read-aloud), `READ_EXTERNAL_STORAGE` (only up to Android 12, for opening shared/opened files on old phones).
+Since S4 (2026-11-07): `USE_BIOMETRIC` + `USE_FINGERPRINT` (added by androidx.biometric) for the optional
+"Unlock with fingerprint / face" — normal permissions; the fingerprint/face never leaves the phone (Android checks it,
+ReadIn only gets yes/no), so nothing changes in the Data safety form.
 NOT in the Play version: `MANAGE_EXTERNAL_STORAGE` (checked by `tool/build_play.sh`). No exact alarms (reminders are inexact),
 no location, camera, microphone, contacts, SMS, or `QUERY_ALL_PACKAGES`. (`android.permission.DUMP` in the merged manifest is
 only a protection on androidx's profile-installer receiver, not a permission ReadIn requests.)

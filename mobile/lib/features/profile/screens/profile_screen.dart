@@ -1,6 +1,7 @@
 import 'package:intl/intl.dart';
 import '../../billing/billing_providers.dart';
 import '../../billing/reminder_emails_row.dart';
+import '../../security/lock_widgets.dart';
 import '../../../widgets/app_toast.dart';
 import '../../shelves/widgets/shelf_widgets.dart';
 import 'package:flutter/foundation.dart';
@@ -358,6 +359,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     title: 'APP SETTINGS',
                     child: SettingsCard(
                       children: [
+                        const BiometricLockRow(),
                         SettingsRow(
                           icon: Ionicons.notifications_outline,
                           iconColor: AppColors.primary400,
