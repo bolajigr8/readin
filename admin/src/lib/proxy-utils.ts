@@ -27,6 +27,8 @@ const ALLOWED: RegExp[] = [
   /^billing\/test$/,
   /^billing\/reminders\/run$/,
   /^payments$/,
+  /^releases$/,
+  /^releases\/[a-f0-9]{24}$/,
   /^users$/,
   /^users\/[a-f0-9]{24}$/,
   /^users\/[a-f0-9]{24}\/verify$/,
