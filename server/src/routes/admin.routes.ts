@@ -20,6 +20,7 @@ import {
   revokeFeature,
   setFeatureConfig,
 } from '../controllers/admin.controller.js'
+import { createRelease, listReleases, updateRelease } from '../controllers/appRelease.controller.js'
 
 const router = Router()
 
@@ -36,6 +37,10 @@ router.put('/billing', setBilling)
 router.post('/billing/test', testPaystack)
 router.post('/billing/reminders/run', runRemindersNow)
 router.get('/payments', listPayments)
+
+router.get('/releases', listReleases)
+router.post('/releases', createRelease)
+router.patch('/releases/:id', updateRelease)
 
 router.get('/users', listUsers)
 router.get('/users/:id', getUser)

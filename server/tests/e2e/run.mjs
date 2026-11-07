@@ -731,6 +731,44 @@ try {
     assert.ok(!serverLog.includes(rita), 'reminder log must not contain the e-mail address')
   })
 
+  // ── S2: app releases / update prompt ──────────────────────────────────────
+  await test('S2 releases: admin publishes, phones get the right answer, bad links refused', async () => {
+    let v = await call('GET', '/app/version?channel=direct&versionCode=2')
+    assert.equal(v.status, 200, v.text)
+    assert.equal(v.json.data.updateAvailable, false)
+    const base = {
+      channel: 'direct', version: '1.0.2', versionCode: 3,
+      downloadUrl: 'https://github.com/bolajigr8/readin-releases/releases/download/v1.0.2/readin-1.0.2-universal.apk',
+      sha256: 'A'.repeat(64), sizeBytes: 90000000, notes: ['  Faster reader ', ''],
+    }
+    const evil = await call('POST', '/admin/releases', { token: adminToken, body: { ...base, downloadUrl: 'https://evil.example/x.apk' } })
+    assert.equal(evil.status, 400)
+    const noAdmin = await call('POST', '/admin/releases', { body: base })
+    assert.equal(noAdmin.status, 401)
+    const draft = await call('POST', '/admin/releases', { token: adminToken, body: base })
+    assert.equal(draft.status, 201, draft.text)
+    assert.equal(draft.json.data.sha256, 'a'.repeat(64))
+    assert.deepEqual(draft.json.data.notes, ['Faster reader'])
+    v = await call('GET', '/app/version?channel=direct&versionCode=2')
+    assert.equal(v.json.data.updateAvailable, false, 'drafts are not offered')
+    const dup = await call('POST', '/admin/releases', { token: adminToken, body: base })
+    assert.equal(dup.status, 409)
+    const pub = await call('PATCH', `/admin/releases/${draft.json.data.id}`, { token: adminToken, body: { published: true } })
+    assert.equal(pub.status, 200, pub.text)
+    assert.ok(pub.json.data.releasedAt)
+    v = await call('GET', '/app/version?channel=direct&versionCode=2')
+    assert.deepEqual([v.json.data.updateAvailable, v.json.data.mandatory, v.json.data.latestVersion], [true, false, '1.0.2'])
+    assert.equal((await call('GET', '/app/version?channel=play&versionCode=2')).json.data.updateAvailable, false)
+    const must = await call('PATCH', `/admin/releases/${draft.json.data.id}`, { token: adminToken, body: { minSupportedVersionCode: 3 } })
+    assert.equal(must.status, 200, must.text)
+    v = await call('GET', '/app/version?channel=direct&versionCode=2')
+    assert.equal(v.json.data.mandatory, true)
+    const list = await call('GET', '/admin/releases', { token: adminToken })
+    assert.equal(list.json.data.items.length, 1)
+    const audits = await mongoose.connection.collection('adminaudits').countDocuments({ action: { $in: ['release.create', 'release.update'] } })
+    assert.ok(audits >= 3, `audit entries: ${audits}`)
+  })
+
   await test('the server log never prints the Paystack key or JWT secrets', async () => {
     assert.ok(!serverLog.includes(PAYSTACK_KEY))
     assert.ok(!serverLog.includes(env.JWT_SECRET) && !serverLog.includes(env.JWT_REFRESH_SECRET))
