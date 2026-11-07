@@ -48,9 +48,11 @@ class Ionicons {
   static const IconData eye_outline = Icons.visibility_outlined;
   static const IconData flash_outline = Icons.flash_on_outlined;
   static const IconData funnel_outline = Icons.filter_list;
+  static const IconData gift_outline = Icons.card_giftcard;
   static const IconData grid_outline = Icons.grid_view_outlined;
   static const IconData headset = Icons.headset;
   static const IconData headset_outline = Icons.headset_outlined;
+  static const IconData heart_outline = Icons.favorite_border;
   static const IconData home = Icons.home;
   static const IconData home_outline = Icons.home_outlined;
   static const IconData information_circle_outline = Icons.info_outline;
