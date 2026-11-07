@@ -12,6 +12,9 @@ import { successResponse } from '../utils/response.utils.js'
 export const getPublicConfig = asyncHandler(async (_req: Request, res: Response) => {
   const [billing, features] = await Promise.all([getBillingConfig(), getFeatureConfig()])
   res.setHeader('Cache-Control', 'public, max-age=15')
+  // Public data only (prices, feature rules): the website readin.micbol.org may read it from the browser.
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.removeHeader('Access-Control-Allow-Credentials')
   successResponse(res, {
     billing: publicBilling(billing),
     features,

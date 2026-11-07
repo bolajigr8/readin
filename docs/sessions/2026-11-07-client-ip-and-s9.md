@@ -38,3 +38,7 @@ Admin Billing page: Free trial, Reminders, Hook text sections. Prices ₦700/30d
   until the next reminder day; only when billingVisibleProvider); Profile `ReminderEmailsRow`; icons gift/heart in shim.
   Checks: analyze ✅ flutter test 232 ✅ (+15 premium_controls_test) tap zones ✅ viewer ✅ audit ✅.
   NOT tested: real phone; UpgradeScreen trial card has no widget test (API + logic tested).
+- Part C (branch `feat/s9-site-prices`): site Premium section (₦700 / ₦7,000, per-day hook, savings, trial line) baked at
+  build + live refresh; server `/config/public` CORS `*` (e2e-checked). Found: Next 16 static export rejects a
+  `no-store` fetch ("dynamic = error") → force-cache + `?build=` timestamp. Checks: site tsc/lint/build ✅,
+  site_check 325 ✅, site_browser 16 ✅ (+2 pricing); server typecheck ✅ e2e 32 ✅.
