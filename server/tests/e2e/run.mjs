@@ -347,7 +347,7 @@ try {
     assert.equal((await call('GET', '/admin/stats')).status, 401)
   })
 
-  await test('role "admin" but e-mail NOT in ADMIN_EMAILS → still 403 (second lock)', async () => {
+  await test('role "admin" with no permissions given (not in ADMIN_EMAILS) → 403 (S5: only what an owner grants)', async () => {
     await users.updateOne({ email: alice }, { $set: { role: 'admin' } })
     const r = await call('GET', '/admin/stats', { token: aliceToken })
     await users.updateOne({ email: alice }, { $set: { role: 'user' } })
@@ -767,6 +767,89 @@ try {
     assert.equal(list.json.data.items.length, 1)
     const audits = await mongoose.connection.collection('adminaudits').countDocuments({ action: { $in: ['release.create', 'release.update'] } })
     assert.ok(audits >= 3, `audit entries: ${audits}`)
+  })
+
+  // ── S5: team, roles and permissions ───────────────────────────────────────
+  await test('S5 team: owner adds a Support admin (password needed); permissions are enforced per route', async () => {
+    const me = await call('GET', '/admin/me', { token: adminToken })
+    assert.equal(me.status, 200, me.text)
+    assert.equal(me.json.data.role, 'owner')
+    assert.ok(me.json.data.permissions.includes('team.manage'))
+    const team = await call('GET', '/admin/team', { token: adminToken })
+    assert.equal(team.status, 200, team.text)
+    assert.ok(team.json.data.presets.some((p) => p.key === 'support'))
+    const sam = 'sam@readin.test'
+    await registerAndVerify(sam, 'Sam')
+    const samLogin = await call('POST', '/auth/login', { body: { email: sam, password: PASSWORD } })
+    const oldRefresh = samLogin.json.data.refreshToken
+    const support = team.json.data.presets.find((p) => p.key === 'support').permissions
+    const wrongPw = await call('POST', '/admin/team', { token: adminToken, body: { email: sam, role: 'admin', permissions: support, password: 'nope' } })
+    assert.equal(wrongPw.status, 403)
+    const notYet = await call('POST', '/admin/team', { token: adminToken, body: { email: 'nobody@readin.test', role: 'admin', permissions: support, password: PASSWORD } })
+    assert.equal(notYet.status, 404)
+    const add = await call('POST', '/admin/team', {
+      token: adminToken,
+      body: { email: sam, role: 'admin', permissions: [...support, 'team.manage'], password: PASSWORD },
+    })
+    assert.equal(add.status, 201, add.text)
+    assert.ok(!add.json.data.permissions.includes('team.manage'), 'team.manage is never given to an admin')
+    // the change ended Sam's old sessions
+    assert.equal((await call('POST', '/auth/refresh', { body: { refreshToken: oldRefresh } })).status, 401)
+    const samToken = await login(sam)
+    const samMe = await call('GET', '/admin/me', { token: samToken })
+    assert.equal(samMe.json.data.role, 'admin')
+    assert.equal((await call('GET', '/admin/users', { token: samToken })).status, 200)
+    assert.equal((await call('GET', '/admin/payments', { token: samToken })).status, 200)
+    for (const [m, p] of [['GET', '/admin/billing'], ['GET', '/admin/team'], ['GET', '/admin/audit'], ['GET', '/admin/releases']]) {
+      assert.equal((await call(m, p, { token: samToken })).status, 403, `${m} ${p} must be refused for Support`)
+    }
+    const aliceId = String((await users.findOne({ email: alice }))._id)
+    const off = await call('PATCH', `/admin/users/${aliceId}`, { token: samToken, body: { disabled: true } })
+    assert.equal(off.status, 200, off.text)
+    await call('PATCH', `/admin/users/${aliceId}`, { token: samToken, body: { disabled: false } })
+    const plan = await call('PATCH', `/admin/users/${aliceId}`, { token: samToken, body: { plan: 'premium' } })
+    assert.equal(plan.status, 403, 'Support has no users.write')
+    const ownerId = String((await users.findOne({ email: ADMIN_EMAIL }))._id)
+    const touchOwner = await call('PATCH', `/admin/users/${ownerId}`, { token: samToken, body: { disabled: true } })
+    assert.equal(touchOwner.status, 403, 'team members are changed only on the Team page')
+    const audits = await mongoose.connection.collection('adminaudits').countDocuments({ action: 'team.add' })
+    assert.equal(audits, 1)
+  })
+
+  await test('S5 team: not yourself, ADMIN_EMAILS owner fixed, owners can manage owners', async () => {
+    const ownerId = String((await users.findOne({ email: ADMIN_EMAIL }))._id)
+    const self = await call('PATCH', `/admin/team/${ownerId}`, { token: adminToken, body: { role: 'admin', password: PASSWORD } })
+    assert.equal(self.status, 409)
+    const olga = 'olga@readin.test'
+    await registerAndVerify(olga, 'Olga')
+    const add = await call('POST', '/admin/team', { token: adminToken, body: { email: olga, role: 'owner', password: PASSWORD } })
+    assert.equal(add.status, 201, add.text)
+    const olgaToken = await login(olga)
+    const demoteFixed = await call('DELETE', `/admin/team/${ownerId}`, { token: olgaToken, body: { password: PASSWORD } })
+    assert.equal(demoteFixed.status, 409, demoteFixed.text)
+    const olgaId = add.json.data.id
+    const removeSelf = await call('DELETE', `/admin/team/${olgaId}`, { token: olgaToken, body: { password: PASSWORD } })
+    assert.equal(removeSelf.status, 409)
+    const remove = await call('DELETE', `/admin/team/${olgaId}`, { token: adminToken, body: { password: PASSWORD } })
+    assert.equal(remove.status, 200, remove.text)
+    assert.equal((await call('GET', '/admin/me', { token: await login(olga) })).status, 403)
+  })
+
+  await test('S5 tester: Premium-equivalent and every feature, no admin panel', async () => {
+    const aliceId = String((await users.findOne({ email: alice }))._id)
+    const r = await call('PATCH', `/admin/users/${aliceId}`, { token: adminToken, body: { role: 'tester' } })
+    assert.equal(r.status, 200, r.text)
+    assert.equal(r.json.data.role, 'tester')
+    const tok = await login(alice)
+    const u = await me(tok)
+    assert.equal(u.role, 'tester')
+    assert.equal(u.plan, 'premium')
+    const f = await call('GET', '/features/me', { token: tok })
+    assert.equal(f.status, 200, f.text)
+    for (const a of Object.values(f.json.data.features ?? f.json.data)) assert.equal(a.allowed, true)
+    assert.equal((await call('GET', '/admin/stats', { token: tok })).status, 403)
+    await call('PATCH', `/admin/users/${aliceId}`, { token: adminToken, body: { role: 'user' } })
+    assert.equal((await me(await login(alice))).role, 'user')
   })
 
   await test('the server log never prints the Paystack key or JWT secrets', async () => {

@@ -1,43 +1,59 @@
 import type { NextFunction, Request, Response } from 'express'
 import { User } from '../models/user.model.js'
+import {
+  effectivePermissions,
+  effectiveRole,
+  isStaff,
+  ownerEmails,
+  type Permission,
+} from '../services/roles.logic.js'
 import { errorResponse } from '../utils/response.utils.js'
 
 /**
- * requireAdmin — use AFTER `protect`.
- *  1. the role is read from the DATABASE (not from the token),
- *  2. the account must not be disabled,
- *  3. if ADMIN_EMAILS is set (comma-separated) the e-mail must be on that list —
- *     a second lock: even a wrongly-set role cannot open the admin API.
- * Failures answer a plain 403 so nothing about the admin API leaks.
+ * requireStaff — use AFTER `protect`. Only owners and admins (S5). Read from the DATABASE on every request
+ * (never from the token); disabled accounts are refused. An e-mail in ADMIN_EMAILS with a verified account is
+ * always an owner (break-glass). Failures answer a plain 403 so nothing about the admin API leaks.
  */
-export const requireAdmin = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> => {
+export const requireStaff = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     if (!req.user) {
       errorResponse(res, 'Not authenticated.', 401)
       return
     }
-    const u = await User.findById(req.user.userId).select('role email disabled').lean()
-    const allow = (process.env['ADMIN_EMAILS'] ?? '')
-      .split(',')
-      .map((s) => s.trim().toLowerCase())
-      .filter(Boolean)
-
-    const ok =
-      !!u &&
-      u.role === 'admin' &&
-      u.disabled !== true &&
-      (allow.length === 0 || allow.includes(u.email.toLowerCase()))
-
-    if (!ok) {
+    const u = await User.findById(req.user.userId).select('role permissions email disabled isEmailVerified').lean()
+    if (!u || u.disabled === true) {
       errorResponse(res, 'Forbidden.', 403)
       return
     }
+    const role = effectiveRole(u, ownerEmails(process.env['ADMIN_EMAILS']))
+    if (!isStaff(role)) {
+      errorResponse(res, 'Forbidden.', 403)
+      return
+    }
+    req.staff = { role, permissions: effectivePermissions(role, u.permissions) }
     next()
   } catch (err) {
     next(err)
   }
 }
+
+/** Kept for older imports: the same as requireStaff. */
+export const requireAdmin = requireStaff
+
+type Guard = ((req: Request, res: Response, next: NextFunction) => void) & { permission: Permission }
+
+/** `can('billing.write')` — the signed-in team member must have this permission (use after requireStaff). */
+export const can = (permission: Permission): Guard => {
+  const guard = ((req: Request, res: Response, next: NextFunction): void => {
+    if (!req.staff?.permissions.includes(permission)) {
+      errorResponse(res, "You don't have permission for this. Ask an owner of ReadIn.", 403)
+      return
+    }
+    next()
+  }) as Guard
+  guard.permission = permission
+  return guard
+}
+
+/** For routes every team member may use (e.g. /admin/me). Marks the route as checked for the route test. */
+export const anyTeamMember = (_req: Request, _res: Response, next: NextFunction): void => next()

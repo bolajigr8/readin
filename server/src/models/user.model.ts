@@ -8,8 +8,15 @@ export interface IUser extends Document {
   displayName: string
   avatar: string
   plan: 'free' | 'premium'
-  /** 'admin' is set ONLY by the create-admin script, never through the API. */
-  role: 'user' | 'admin'
+  /**
+   * S5: owner / admin = the team (set on the admin Team page by an owner, or by a script), tester = testing
+   * helper (Premium-equivalent, no admin panel), user = everyone else. See services/roles.logic.ts.
+   */
+  role: 'user' | 'tester' | 'admin' | 'owner'
+  /** Admin-panel permissions of an `admin` (owners have all). */
+  permissions: string[]
+  roleChangedAt: Date | null
+  roleChangedBy: Types.ObjectId | null
   /** An administrator can switch an account off (cannot log in or refresh). */
   disabled: boolean
   lastLoginAt: Date | null
@@ -73,8 +80,21 @@ const userSchema = new Schema<IUser>(
     },
     role: {
       type: String,
-      enum: ['user', 'admin'],
+      enum: ['user', 'tester', 'admin', 'owner'],
       default: 'user',
+    },
+    permissions: {
+      type: [String],
+      default: [],
+    },
+    roleChangedAt: {
+      type: Date,
+      default: null,
+    },
+    roleChangedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
     },
     disabled: {
       type: Boolean,

@@ -6,6 +6,8 @@ import { User } from '../models/user.model.js'
 import { decide, pickUserId, type RcEvent } from '../services/revenuecat.logic.js'
 import { verifyWebhookSignature } from '../services/paystack.service.js'
 import { settlePayment } from '../services/payments.service.js'
+import { roleOf } from '../services/roles.service.js'
+import { isStaff } from '../services/roles.logic.js'
 
 /** Constant-time comparison (no timing leak of the secret). */
 const safeEqual = (a: string, b: string): boolean => {
@@ -50,7 +52,7 @@ export const revenueCatWebhook = asyncHandler(async (req: Request, res: Response
     return
   }
 
-  const user = await User.findById(userId).select('plan role premiumUntil premiumEventAt')
+  const user = await User.findById(userId).select('plan role email isEmailVerified premiumUntil premiumEventAt')
   if (!user) {
     res.status(200).json({ received: true })
     return
@@ -59,7 +61,7 @@ export const revenueCatWebhook = asyncHandler(async (req: Request, res: Response
   const decision = decide(event, { premiumUntil: user.premiumUntil ?? null, premiumEventAt: user.premiumEventAt ?? null }, new Date())
   if (decision.action === 'ignore') {
     console.log(`[revenuecat] ${event.type ?? '?'} | ${userId}: ignored (${decision.reason})`)
-  } else if (user.role === 'admin') {
+  } else if (isStaff(roleOf(user))) {
     console.log(`[revenuecat] ${event.type ?? '?'} | ${userId}: administrator account left unchanged`)
   } else {
     user.plan = decision.plan

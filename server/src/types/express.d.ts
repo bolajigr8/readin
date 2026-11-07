@@ -9,6 +9,11 @@ declare global {
         userId: string
         plan: string
       }
+      /** Set by requireStaff (admin.middleware.ts): the team member's role and admin-panel permissions (S5). */
+      staff?: {
+        role: import('../services/roles.logic.js').Role
+        permissions: import('../services/roles.logic.js').Permission[]
+      }
     }
   }
 }

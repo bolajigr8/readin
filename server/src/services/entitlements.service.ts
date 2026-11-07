@@ -9,6 +9,8 @@ import {
   type FeatureKey,
   type UserFeatureState,
 } from './entitlements.logic.js'
+import { roleOf } from './roles.service.js'
+import type { Role } from './roles.logic.js'
 
 export * from './entitlements.logic.js'
 
@@ -34,7 +36,7 @@ export const getFeatureConfig = async (): Promise<Record<FeatureKey, FeatureConf
 
 export interface Actor {
   id: string
-  role: 'user' | 'admin'
+  role: Role
   plan: 'free' | 'premium'
   disabled: boolean
   email: string
@@ -42,11 +44,11 @@ export interface Actor {
 
 /** Always read from the database — a token can be up to 15 minutes old. */
 export const loadActor = async (userId: string): Promise<Actor | null> => {
-  const u = await User.findById(userId).select('role plan disabled email').lean()
+  const u = await User.findById(userId).select('role plan disabled email isEmailVerified').lean()
   if (!u) return null
   return {
     id: String(u._id),
-    role: u.role === 'admin' ? 'admin' : 'user',
+    role: roleOf(u),
     plan: u.plan === 'premium' ? 'premium' : 'free',
     disabled: u.disabled === true,
     email: u.email,

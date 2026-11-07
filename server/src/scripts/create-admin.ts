@@ -42,24 +42,24 @@ const main = async (): Promise<void> => {
   const existing = await User.findOne({ email })
 
   if (existing) {
-    existing.role = 'admin'
+    existing.role = 'owner' // S5: the script creates OWNERS (full control, incl. the Team page)
     existing.passwordHash = passwordHash
     existing.isEmailVerified = true
     existing.disabled = false
     existing.plan = 'premium'
     existing.refreshTokens = []
     await existing.save()
-    console.log(`\n✓ Existing account promoted to administrator: ${email}`)
+    console.log(`\n✓ Existing account promoted to owner: ${email}`)
   } else {
     await User.create({
       email,
       passwordHash,
       displayName: name,
-      role: 'admin',
+      role: 'owner',
       plan: 'premium',
       isEmailVerified: true,
     })
-    console.log(`\n✓ Administrator created: ${email}`)
+    console.log(`\n✓ Owner created: ${email}`)
   }
 
   console.log('  Sign in with this e-mail and the password you set. The password is not stored anywhere else.\n')

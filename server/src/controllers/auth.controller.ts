@@ -15,6 +15,8 @@ import { successResponse, errorResponse } from '../utils/response.utils.js'
 import { emailService } from '../services/email/email.service.js'
 import { effectivePlan } from '../services/billing.logic.js'
 import { verifyEmailPage } from '../services/pages/pages.js'
+import { roleOf } from '../services/roles.service.js'
+import { isStaff, planForRole } from '../services/roles.logic.js'
 
 // ── Zod Schemas ───────────────────────────────────────────────────────────────
 
@@ -69,8 +71,11 @@ const formatUser = (user: {
   email: user.email,
   displayName: user.displayName,
   avatar: user.avatar,
-  plan: effectivePlan(user.plan === 'premium' ? 'premium' : 'free', user.premiumUntil ?? null, new Date()),
-  role: user.role,
+  plan: planForRole(
+    roleOf(user),
+    effectivePlan(user.plan === 'premium' ? 'premium' : 'free', user.premiumUntil ?? null, new Date()),
+  ),
+  role: roleOf(user),
   premiumUntil: user.premiumUntil ?? null,
   isEmailVerified: user.isEmailVerified,
 })
@@ -253,7 +258,7 @@ export const googleOAuth = asyncHandler(async (req: Request, res: Response) => {
 
     // 2. Has an email account — link Google to it
     const byEmail = await User.findOne({ email: normalizedEmail })
-    if (byEmail && byEmail.role === 'admin') return byEmail // rejected below, never linked
+    if (byEmail && isStaff(roleOf(byEmail))) return byEmail // team accounts: rejected below, never linked
     if (byEmail) {
       byEmail.googleId = googleId
       byEmail.isEmailVerified = true
@@ -274,8 +279,8 @@ export const googleOAuth = asyncHandler(async (req: Request, res: Response) => {
   })()
   // TypeScript now knows resolvedUser is IUser (never null) ✓
 
-  // Administrators sign in with e-mail + password only.
-  if (resolvedUser.role === 'admin') {
+  // The team (owners / admins) signs in with e-mail + password only.
+  if (isStaff(roleOf(resolvedUser))) {
     errorResponse(res, 'Administrator accounts must sign in with e-mail and password.', 403)
     return
   }

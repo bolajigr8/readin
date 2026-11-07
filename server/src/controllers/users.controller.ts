@@ -3,6 +3,7 @@ import asyncHandler from 'express-async-handler'
 import { z } from 'zod'
 import { User } from '../models/user.model.js'
 import { successResponse, errorResponse } from '../utils/response.utils.js'
+import { roleOf } from '../services/roles.service.js'
 
 const pushTokenSchema = z.object({
   expoPushToken: z
@@ -61,7 +62,7 @@ export const getMe = asyncHandler(async (req: Request, res: Response) => {
       displayName: u.displayName,
       avatar: u.avatar,
       plan: req.user.plan,
-      role: u.role,
+      role: roleOf(u),
       premiumUntil: u.premiumUntil ?? null,
       isEmailVerified: u.isEmailVerified,
     },

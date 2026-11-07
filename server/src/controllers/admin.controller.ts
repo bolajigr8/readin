@@ -1,3 +1,4 @@
+import mongoose from 'mongoose'
 import type { Request, Response } from 'express'
 import asyncHandler from 'express-async-handler'
 import { Types } from 'mongoose'
@@ -43,6 +44,8 @@ import {
   toState,
   type Access,
 } from '../services/entitlements.service.js'
+import { isStaff, type Permission } from '../services/roles.logic.js'
+import { roleOf } from '../services/roles.service.js'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -156,7 +159,7 @@ export const listUsers = asyncHandler(async (req: Request, res: Response) => {
         email: u.email,
         displayName: u.displayName,
         plan: u.plan,
-        role: u.role ?? 'user',
+        role: roleOf(u),
         disabled: u.disabled === true,
         isEmailVerified: u.isEmailVerified,
         createdAt: u.createdAt,
@@ -190,7 +193,7 @@ export const getUser = asyncHandler(async (req: Request, res: Response) => {
   for (const key of FEATURE_KEYS) {
     const row = rows.find((r) => r.key === key)
     const access = evaluateAccess({
-      role: u.role === 'admin' ? 'admin' : 'user',
+      role: roleOf(u),
       plan: u.plan === 'premium' ? 'premium' : 'free',
       config: config[key],
       uf: toState(row),
@@ -209,7 +212,7 @@ export const getUser = asyncHandler(async (req: Request, res: Response) => {
         email: u.email,
         displayName: u.displayName,
         plan: u.plan,
-        role: u.role ?? 'user',
+        role: roleOf(u),
         disabled: u.disabled === true,
         isEmailVerified: u.isEmailVerified,
         createdAt: u.createdAt,
@@ -227,14 +230,15 @@ const patchUserSchema = z
   .object({
     plan: z.enum(['free', 'premium']).optional(),
     disabled: z.boolean().optional(),
+    /** Only between "user" and "tester" here; the team is managed on the Team page (owners). */
+    role: z.enum(['user', 'tester']).optional(),
   })
   .strict()
 
 /**
- * PATCH /admin/users/:id { plan?, disabled? }
- * Administrators cannot be changed here (role changes happen only through the
- * create-admin script on the server) — so a stolen admin token cannot demote,
- * disable or lock out the real admin.
+ * PATCH /admin/users/:id { plan?, disabled?, role? }
+ * Team members (owners / admins) cannot be changed here — only on the Team page by an owner — so a stolen
+ * admin login cannot demote, disable or lock out the team. Each change needs its own permission.
  */
 export const patchUser = asyncHandler(async (req: Request, res: Response) => {
   const id = userIdParam(req, res)
@@ -244,14 +248,28 @@ export const patchUser = asyncHandler(async (req: Request, res: Response) => {
     errorResponse(res, 'Invalid change.', 400)
     return
   }
+  const need: Permission[] = [
+    ...(parsed.data.plan !== undefined || parsed.data.role !== undefined ? (['users.write'] as const) : []),
+    ...(parsed.data.disabled !== undefined ? (['users.disable'] as const) : []),
+  ]
+  if (need.some((p) => !req.staff?.permissions.includes(p))) {
+    errorResponse(res, "You don't have permission for this. Ask an owner of ReadIn.", 403)
+    return
+  }
   const u = await User.findById(id)
   if (!u) {
     errorResponse(res, 'User not found.', 404)
     return
   }
-  if (u.role === 'admin') {
-    errorResponse(res, 'Administrator accounts cannot be changed here.', 403)
+  if (isStaff(roleOf(u))) {
+    errorResponse(res, 'Team members are changed on the Team page (owners only).', 403)
     return
+  }
+  if (parsed.data.role !== undefined && parsed.data.role !== u.role) {
+    u.role = parsed.data.role
+    u.permissions = []
+    u.roleChangedAt = new Date()
+    u.roleChangedBy = req.user ? (new mongoose.Types.ObjectId(req.user.userId) as never) : null
   }
   if (parsed.data.plan !== undefined) {
     u.plan = parsed.data.plan
@@ -263,7 +281,7 @@ export const patchUser = asyncHandler(async (req: Request, res: Response) => {
   }
   await u.save()
   await audit(req, 'user.patch', id, parsed.data)
-  successResponse(res, { id, plan: u.plan, disabled: u.disabled }, 'Saved.')
+  successResponse(res, { id, plan: u.plan, disabled: u.disabled, role: roleOf(u) }, 'Saved.')
 })
 
 // ── per-user feature controls ─────────────────────────────────────────────────

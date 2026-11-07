@@ -3,6 +3,8 @@ import { verifyAccessToken } from '../utils/jwt.utils.js'
 import { errorResponse } from '../utils/response.utils.js'
 import { User } from '../models/user.model.js'
 import { effectivePlan } from '../services/billing.logic.js'
+import { roleOf } from '../services/roles.service.js'
+import { planForRole } from '../services/roles.logic.js'
 
 /**
  * protect — verifies the Bearer access token and attaches `req.user`.
@@ -37,7 +39,7 @@ export const protect = async (
   }
 
   try {
-    const u = await User.findById(userId).select('plan premiumUntil disabled').lean()
+    const u = await User.findById(userId).select('plan premiumUntil disabled role email isEmailVerified').lean()
     if (!u || u.disabled === true) {
       errorResponse(res, 'Invalid or expired access token.', 401)
       return
@@ -48,7 +50,8 @@ export const protect = async (
       // paid period is over → store it (best effort)
       User.updateOne({ _id: u._id, plan: 'premium' }, { $set: { plan: 'free' } }).catch(() => undefined)
     }
-    req.user = { userId, plan }
+    // Testers and the team use the app like Premium members (S5) — the stored plan is not changed.
+    req.user = { userId, plan: planForRole(roleOf(u), plan) }
     next()
   } catch (err) {
     next(err)

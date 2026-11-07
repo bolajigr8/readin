@@ -56,7 +56,8 @@ export interface Access {
 const DAY_MS = 24 * 60 * 60 * 1000
 
 export const evaluateAccess = (input: {
-  role: 'user' | 'admin'
+  /** owner / admin / tester get every feature (S5); 'user' follows the rules below. */
+  role: 'user' | 'tester' | 'admin' | 'owner'
   plan: 'free' | 'premium'
   config: FeatureConfig
   uf: UserFeatureState | null
@@ -75,8 +76,8 @@ export const evaluateAccess = (input: {
     grantedUntil: uf?.grantedUntil ? uf.grantedUntil.toISOString() : null,
   }
 
-  if (role === 'admin') {
-    return { ...base, state: 'full', allowed: true, reason: 'admin' }
+  if (role !== 'user') {
+    return { ...base, state: 'full', allowed: true, reason: role === 'tester' ? 'tester' : 'admin' }
   }
   if (!config.enabled) {
     return { ...base, state: 'disabled', reason: 'This feature is switched off.' }
