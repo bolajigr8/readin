@@ -1,7 +1,7 @@
 # NEXT — where we are right now (Claude Code keeps this current)
 
-**Updated:** 2026-11-07   **Current stage:** S9.2 Premium controls — part A (server + admin) on `feat/s9-premium-controls`
-(waiting for merge); next part B (app), part C (site). Latest log: `sessions/2026-11-07-client-ip-and-s9.md`.
+**Updated:** 2026-11-07   **Current stage:** S9.2 Premium controls — A merged (#19); B, C + 2 admin fixes pushed, waiting
+for merge (order below). Latest log: `sessions/2026-11-07-client-ip-and-s9.md`.
 
 ## Done
 - S0, S1 (except S1.6 phone test), S8 two versions (merged). Release key + first signed APKs/AAB 1.0.0+1.
@@ -11,6 +11,13 @@
 - Paystack (APK) paused: Paystack's firewall blocks Render (support contacted 2026-11-06). Play will use Google Play Billing (DECISIONS #16).
 - Redis (Upstash): WORKING since 2026-11-06 (fix/redis-upstash merged; live RateLimit-Remaining counts down). `fix/redis-startup-race`
   removes the false "Redis unavailable" line at boot — waiting for merge.
+
+## Waiting for Michael's merge (any order; each was merged with main before pushing)
+- `feat/s9-app-premium` (app: hooks, trial card, Home reminder banner, Profile e-mail switch) → then a new APK/AAB build.
+- `feat/s9-site-prices` (website Premium section + server CORS for /config/public).
+- `fix/admin-billing-phone-width` (Billing page fits phones) · `chore/admin-next-upgrade` (Next 16.4.3, security).
+- Open: Render log line `[client-ip] using …` (Michael to paste) · iPhone = new stage S11 (Apple $99/yr, Mac or Codemagic,
+  Apple in-app purchase, TestFlight) — Michael to decide · free trial days (admin switch, default off).
 
 ## Next 3 steps
 1. ✅ S7.1 built — Michael: merge `feat/s7-account-deletion` + deploy Render; try Profile → Delete account with a TEST account.

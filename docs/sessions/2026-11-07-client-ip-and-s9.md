@@ -42,3 +42,8 @@ Admin Billing page: Free trial, Reminders, Hook text sections. Prices ₦700/30d
   build + live refresh; server `/config/public` CORS `*` (e2e-checked). Found: Next 16 static export rejects a
   `no-store` fetch ("dynamic = error") → force-cache + `?build=` timestamp. Checks: site tsc/lint/build ✅,
   site_check 325 ✅, site_browser 16 ✅ (+2 pricing); server typecheck ✅ e2e 32 ✅.
+- Admin screenshots (Michael approved a short local run): built admin + fake API + Edge at 1280/390 px, stopped after.
+  Found 108 px sideways overflow on phones (grid items without min-w-0 + my 420 px unbreakable "Use recommended (…)"
+  button) → `fix/admin-billing-phone-width`: 0 px both widths, no page errors.
+- `chore/admin-next-upgrade`: next + eslint-config-next 16.4.0 → 16.4.3 (no download; site already had it); tsc/lint/
+  build (security warning gone)/proxy test/browser login ✅.
