@@ -1,10 +1,11 @@
 import { Features, FormatMarquee } from '@/components/features'
 import { Hero } from '@/components/hero'
+import { Pricing } from '@/components/pricing'
 import { Faq, FinalCta, HowItWorks, Privacy } from '@/components/sections'
 import { SiteFooter } from '@/components/site-footer'
 import { SiteHeader } from '@/components/site-header'
 
-export default function Home() {
+export default async function Home() {
   return (
     <>
       <SiteHeader />
@@ -14,6 +15,7 @@ export default function Home() {
         <Features />
         <HowItWorks />
         <Privacy />
+        <Pricing />
         <Faq />
         <FinalCta />
       </main>
