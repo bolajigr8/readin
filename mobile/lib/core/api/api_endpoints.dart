@@ -26,6 +26,9 @@ class ApiEndpoints {
   static const String featuresMe = '/features/me';
   static const String publicConfig = '/config/public';
   static const String paymentsCheckout = '/payments/checkout';
+  static const String billingStatus = '/billing/status';
+  static const String billingTrial = '/billing/trial';
+  static const String billingReminders = '/billing/reminders';
   static String paymentsVerify(String reference) => '/payments/verify/$reference';
   static const String usersMe = '/users/me';
   static const String resendVerification = '/auth/resend-verification';

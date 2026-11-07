@@ -31,3 +31,10 @@ Admin Billing page: Free trial, Reminders, Hook text sections. Prices ₦700/30d
   NOT done: admin screenshots (needs a local server — ask Michael first). Admin Next 16.4.0 security warning at build
   (known, DECISIONS #19) → separate upgrade branch, ask Michael.
 - Next: part B (app: Premium screen hooks + trial button, Home banner, Profile switch), part C (site prices).
+- Part A merged (#19) and live: /config/public shows "less than ₦24 a day" + "2 months free · save ₦1,400".
+- Part B (branch `feat/s9-app-premium`): models (perDayText, savingsText, trialDays, headline, reminders, BillingStatus,
+  `premiumReminderFor` = server rule), ApiClient.patch, BillingApi.status/startTrial/setEmailReminders,
+  billingStatusProvider; UpgradeScreen headline + hooks + `_TrialCard`; Home `PremiumReminderBanner` ("Later" hides
+  until the next reminder day; only when billingVisibleProvider); Profile `ReminderEmailsRow`; icons gift/heart in shim.
+  Checks: analyze ✅ flutter test 232 ✅ (+15 premium_controls_test) tap zones ✅ viewer ✅ audit ✅.
+  NOT tested: real phone; UpgradeScreen trial card has no widget test (API + logic tested).

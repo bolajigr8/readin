@@ -36,6 +36,33 @@ class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => ref.read(publicConfigProvider.notifier).refresh());
   }
 
+  Future<void> _startTrial(int days) async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _busyLabel = 'Starting your free trial…';
+    });
+    final res = await ref.read(billingApiProvider).startTrial();
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (res.dataOrNull == null) {
+      AppToast.error(res.exceptionOrNull?.message ?? 'Could not start the free trial.');
+      ref.invalidate(billingStatusProvider);
+      return;
+    }
+    await ref.read(refreshUserProvider)();
+    await ref.read(featuresProvider.notifier).refresh();
+    ref.invalidate(billingStatusProvider);
+    if (!mounted) return;
+    await showAlertDialog(
+      context,
+      title: 'Your free trial has started 🎉',
+      message: 'Enjoy $days days of Premium — unlimited books and every feature. Nothing is charged when it ends; '
+          "we'll remind you before it does.",
+    );
+    if (mounted) _close();
+  }
+
   void _close() {
     if (context.canPop()) {
       context.pop();
@@ -100,6 +127,7 @@ class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
       case PaymentStatus.success:
         await ref.read(refreshUserProvider)();
         await ref.read(featuresProvider.notifier).refresh();
+        ref.invalidate(billingStatusProvider);
         if (!mounted) return;
         await showAlertDialog(
           context,
@@ -132,6 +160,8 @@ class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
     final plan = _plan(billing.plans);
     final isPremium = user?.plan == 'premium';
     final canBuy = ref.watch(billingVisibleProvider);
+    final status = canBuy && !isPremium ? ref.watch(billingStatusProvider).valueOrNull : null;
+    final trialDays = status?.trialAvailable == true ? status!.trialDays : 0;
 
     return Scaffold(
       body: SafeArea(
@@ -159,7 +189,7 @@ class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
                           Text('ReadIn Premium', textAlign: TextAlign.center, style: AppTypography.title22),
                           const SizedBox(height: 6),
                           Text(
-                            'Read without limits and unlock every feature.',
+                            billing.headline.isNotEmpty ? billing.headline : 'Read without limits and unlock every feature.',
                             textAlign: TextAlign.center,
                             style: AppTypography.label(size: 14, color: AppColors.textSecondary),
                           ),
@@ -170,9 +200,13 @@ class _UpgradeScreenState extends ConsumerState<UpgradeScreen> {
                           const SizedBox(height: 22),
                           _Benefits(freeLimit: billing.freeLibraryLimit),
                           const SizedBox(height: 24),
+                          if (canBuy && trialDays > 0) ...[
+                            _TrialCard(days: trialDays, busy: _busy, onStart: () => _startTrial(trialDays)),
+                            const SizedBox(height: 22),
+                          ],
                           if (canBuy) ...[
                             Text(
-                              isPremium ? 'ADD MORE TIME' : 'CHOOSE A PLAN',
+                              isPremium ? 'ADD MORE TIME' : (trialDays > 0 ? 'OR CHOOSE A PLAN' : 'CHOOSE A PLAN'),
                               style: AppTypography.label(size: 11, weight: FontWeight.w600, letterSpacing: 0.8, color: AppColors.textMuted),
                             ),
                             const SizedBox(height: 10),
@@ -391,6 +425,20 @@ class _PlanCard extends StatelessWidget {
                       plan.description.isEmpty ? durationText(plan.durationDays) : plan.description,
                       style: AppTypography.label(size: 12, color: AppColors.textMuted),
                     ),
+                    if (plan.perDayText.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        _capitalize(plan.perDayText),
+                        style: AppTypography.label(size: 12, weight: FontWeight.w600, color: AppColors.textSecondary),
+                      ),
+                    ],
+                    if (plan.savingsText.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        plan.savingsText,
+                        style: AppTypography.label(size: 12, weight: FontWeight.w700, color: AppColors.success500),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -407,4 +455,62 @@ class _PlanCard extends StatelessWidget {
       ),
     );
   }
+}
+
+String _capitalize(String s) => s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+
+/// "Try Premium free for N days" (admin setting; once per account, the server decides).
+class _TrialCard extends StatelessWidget {
+  const _TrialCard({required this.days, required this.busy, required this.onStart});
+
+  final int days;
+  final bool busy;
+  final VoidCallback onStart;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        key: const ValueKey('trial-card'),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.alpha(AppColors.success500, 0x14),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.alpha(AppColors.success500, 0x60)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Icon(Ionicons.gift_outline, color: AppColors.success500),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text('Try Premium free for $days days', style: AppTypography.label(size: 16, weight: FontWeight.w700)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'No payment needed. Nothing is charged when the trial ends.',
+              style: AppTypography.label(size: 13, color: AppColors.textSecondary, lineHeight: 19),
+            ),
+            const SizedBox(height: 12),
+            PressableOpacity(
+              pressedOpacity: 0.85,
+              onTap: busy ? null : onStart,
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: busy ? AppColors.alpha(AppColors.success500, 0x70) : AppColors.success500,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  'Start my free trial',
+                  style: AppTypography.label(size: 15, weight: FontWeight.w700, color: AppColors.white),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
 }
