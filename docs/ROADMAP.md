@@ -27,13 +27,13 @@ Order matters: S0 → S1 → S2 → S3 are needed to start acquiring users safel
 - [x] S2.2 [C] (done 2026-11-07: admin "App versions" page) Admin page **Releases** (list, create, mark latest, set minimum supported, mandatory toggle with plain-language explanation, release notes, checksum). Add to proxy whitelist + tests.
 - [x] S2.3 [C] (done 2026-11-07: `features/update`; version from `lib/app/app_version.dart`, no package_info) App `UpdateService` (check at launch + on resume, throttled ≥6 h; sends `X-App-Version`/`X-App-Build` headers on all API calls too). Optional update → non-blocking banner/dialog "Update later / Update"; **mandatory** → full-screen blocking page with the download button. **Never interrupt an open reading session**: show prompts only on Home/Library (queue while the reader is open). Open the URL with `url_launcher` (external browser). No silent install, no `REQUEST_INSTALL_PACKAGES`. Show the checksum on the landing page, not in-app.
 - [x] S2.4 [C] (done 2026-11-07: server 9 unit + e2e, app `update_test.dart` 11) Tests: version comparison edge cases, throttling, mandatory gate, offline/server-asleep behaviour (never block a user because the version server is unreachable).
-- [ ] S2.5 [M] Publish release 1.0.0 in admin once S1+S3 are live.
+- [ ] S2.5 [M] (now: add 1.0.2 in admin → App versions — 1.0.2 is the first version that can show the prompt) Publish release 1.0.0 in admin once S1+S3 are live.
 
 ## S3 — Landing page (Vercel) — see LANDING_PAGE_PLAN.md
 - [x] S3.1 [C] (done 2026-11-06 as plain HTML for Cloudflare Pages — download buttons driven by `site/release.json` until S2's /app/version exists; `tool/site_check.mjs` 150 checks + `tool/site_browser.mjs` 11 tests) New `project/site/` (Next.js static/ISR, same toolchain as admin): download button, version/size/date/checksum from `GET /app/version`, release notes, install guide with Play-Protect / unknown-sources / Samsung Auto-Blocker steps, FAQ, QR code, links to `/privacy`, `/terms`, `/delete-account`.
 - [x] S3.2 [C] (done 2026-11-06: /privacy, /terms, /delete-account — DRAFTS for Michael's review) Pages `/privacy`, `/terms`, `/delete-account` (drafts; flagged "to be reviewed by Michael/lawyer").
 - [x] S3.3 [C] (done 2026-11-06: render.yaml buildFilter server/**; site needs no build) `render.yaml` buildFilters so API redeploys only for `server/**`; Vercel ignored-build-step docs for `admin` and `site`.
-- [ ] S3.4 [M] Create the Vercel project (Root Directory `site`), host the APK (GitHub Releases `readin-releases`), (optional) buy a domain.
+- [x] S3.4 [M] (done 2026-11-07 on Cloudflare Pages instead of Vercel: readin.micbol.org; APK on GitHub readin-releases) Create the Vercel project (Root Directory `site`), host the APK (GitHub Releases `readin-releases`), (optional) buy a domain.
 
 ## S4 — Biometric sign-in — see BIOMETRIC_PLAN.md ⚠ (touches MainActivity + auth flow)
 - [x] S4.1 [C] (done 2026-11-07: local_auth 3.0.2, FlutterFragmentActivity, appcompat themes; debug APK builds) `local_auth`; `MainActivity` → `FlutterFragmentActivity` (required by the plugin); manifest `USE_BIOMETRIC`; `BiometricService` interface + fake for tests.
@@ -71,7 +71,7 @@ Order matters: S0 → S1 → S2 → S3 are needed to start acquiring users safel
 
 ## S9 — Subscription hardening
 - [ ] S9.1 [C] Paystack events: `charge.success` (done), `refund.processed`, `charge.dispute.create/resolve` → mark payment refunded/disputed, shorten/revoke `premiumUntil` per policy (ask), admin visibility + reconcile button ("re-check with Paystack").
-- [ ] S9.2 [C] Expiry UX: in-app banner 5 days before `premiumUntil`, e-mail reminder (job), "Renew" CTA that stacks time; failed/abandoned payments surface; restore = sign in (documented).
+- [x] S9.2 [C] (done 2026-11-07, more than planned: admin-set trial, reminder days, banner + e-mail, price hooks, site prices) Expiry UX: in-app banner 5 days before `premiumUntil`, e-mail reminder (job), "Renew" CTA that stacks time; failed/abandoned payments surface; restore = sign in (documented).
 - [ ] S9.3 [later] Paystack recurring charges (authorization reuse) — only after S0–S8.
 
 ## S10 — QA & release 1.0.0

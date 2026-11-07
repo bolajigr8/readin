@@ -2,7 +2,7 @@ name: readin_flutter
 description: "ReadIn - e-reader (Flutter port of the React Native app)."
 publish_to: 'none'
 
-version: 1.0.1+2
+version: 1.0.2+3
 
 environment:
   sdk: ^3.12.2
@@ -78,9 +78,9 @@ flutter:
   # `flutter run` / `flutter build` without --flavor use this one.
   default-flavor: direct
   uses-material-design: true
+  # Only what the app loads while running. assets/images/ and assets/icons/ are SOURCE pictures for
+  # flutter_launcher_icons / flutter_native_splash (build time) — bundling them added ~1.1 MB for nothing.
   assets:
-    - assets/images/
-    - assets/icons/
     - assets/audio/
     - assets/reader/
     - assets/reader/fonts/

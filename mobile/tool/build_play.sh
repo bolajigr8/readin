@@ -49,7 +49,9 @@ else bash "$ROOT/tool/verify.sh" --only mobile || die "app checks failed — fix
 step "3/5 Build the Play bundle (this can take 10–20 minutes)"
 AAB="$APP/build/app/outputs/bundle/playRelease/app-play-release.aab"
 rm -f "$AAB"
-flutter build appbundle --flavor play --release || die "AAB build failed."
+# Same size savings as the APK: Dart debug info kept out of the app (build/release/<version>/debug-symbols-play,
+# keep private — needed to read crash reports). Google Play already sends each phone only its own CPU part.
+flutter build appbundle --flavor play --release --obfuscate "--split-debug-info=$APP/build/release/$NAME+$CODE/debug-symbols-play"   || die "AAB build failed."
 [ -f "$AAB" ] || die "expected $AAB"
 
 step "4/5 Safety checks"

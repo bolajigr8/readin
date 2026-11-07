@@ -8,7 +8,10 @@
 # Run from project/mobile (or anywhere: it finds its own folder). Steps:
 #   1. android/key.properties must exist (it is never printed).
 #   2. All app checks (project/tool/verify.sh --only mobile) unless --skip-checks.
-#   3. flutter build apk --flavor direct --release (universal) and --split-per-abi.
+#   3. flutter build apk --flavor direct --release: "universal" = arm + arm64 (every real phone; no x86_64, which is
+#      only for emulators/Chromebooks — saves ~29 MB) and --split-per-abi. Both --obfuscate --split-debug-info:
+#      the Dart debug info goes to build/release/<version>/debug-symbols (KEEP it, never publish it — needed to read
+#      crash reports), ~1.5 MB smaller per phone type.
 #   4. apksigner verify --print-certs on every APK; stops if one is signed with the
 #      debug key or with a different certificate than the others.
 #   5. Copies the APKs to build/release/<version>/ with a notes file:
@@ -62,8 +65,10 @@ fi
 step "3/5 Build (this can take 10–25 minutes)"
 OUT="$APP/build/app/outputs/flutter-apk"
 rm -f "$OUT"/app-*release.apk "$OUT"/app-*release.apk.sha1 2>/dev/null
-flutter build apk --flavor direct --release || die "universal APK build failed."
-flutter build apk --flavor direct --release --split-per-abi || die "per-ABI APK build failed."
+SYMBOLS="$APP/build/release/$NAME+$CODE/debug-symbols"
+SIZE_FLAGS=(--obfuscate "--split-debug-info=$SYMBOLS")
+flutter build apk --flavor direct --release --target-platform android-arm,android-arm64 "${SIZE_FLAGS[@]}"   || die "universal APK build failed."
+flutter build apk --flavor direct --release --split-per-abi "${SIZE_FLAGS[@]}" || die "per-ABI APK build failed."
 shopt -s nullglob
 APKS=("$OUT"/app-direct-release.apk "$OUT"/app-*-direct-release.apk)
 shopt -u nullglob
@@ -133,7 +138,8 @@ for apk in "${APKS[@]}"; do
 done
 {
   echo
-  echo "Which file? Most phones: arm64-v8a. Very old phones: armeabi-v7a. Not sure: universal (bigger)."
+  echo "Which file? Most phones: arm64-v8a. Very old phones: armeabi-v7a. Not sure: universal (bigger, works on every phone)."
+  echo "x86_64 is only for emulators / Chromebooks. debug-symbols/ = keep private (crash reports), never upload it."
 } >>"$NOTES"
 
 echo

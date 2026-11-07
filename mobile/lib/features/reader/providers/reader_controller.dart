@@ -340,7 +340,7 @@ class ReaderController extends StateNotifier<ReaderState> {
         e.message,
         canRedownload: e is InvalidFileException || e is DownloadException,
         canRelink: e is MissingLocalFileException,
-        detail: '${e.runtimeType}${e.statusCode != null ? ' · HTTP ${e.statusCode}' : ''}',
+        detail: '${_errorKind(e)}${e.statusCode != null ? ' · HTTP ${e.statusCode}' : ''}',
       );
       return;
     } catch (_) {
@@ -729,3 +729,17 @@ final readerControllerProvider = StateNotifierProvider.autoDispose
 });
 
 final dictionaryServiceProvider = Provider<DictionaryService>((ref) => DictionaryService());
+
+/// Stable name for the reader's error detail (release builds are obfuscated, so `runtimeType` would be scrambled).
+String _errorKind(AppException e) {
+  if (e is InvalidFileException) return 'InvalidFile';
+  if (e is MissingLocalFileException) return 'MissingLocalFile';
+  if (e is DownloadException) return 'Download';
+  if (e is NetworkException) return 'Network';
+  if (e is RequestTimeoutException) return 'Timeout';
+  if (e is NotFoundException) return 'NotFound';
+  if (e is UnauthorizedException) return 'Unauthorized';
+  if (e is ForbiddenException) return 'Forbidden';
+  if (e is ServerException) return 'Server';
+  return 'Error';
+}
