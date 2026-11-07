@@ -12,9 +12,15 @@ import { getBillingConfig, invalidateBillingConfig } from '../services/billing.s
 import {
   MAX_PLANS,
   MAX_PRICE_KOBO,
+  MAX_REMINDER_OFFSET,
+  MAX_REMINDER_STEPS,
+  MAX_TRIAL_DAYS,
   MIN_PRICE_KOBO,
+  MIN_REMINDER_OFFSET,
   formatNaira,
   normalizePlansInput,
+  normalizeReminderSteps,
+  planHooks,
 } from '../services/billing.logic.js'
 import {
   paystackConfigured,
@@ -27,6 +33,7 @@ import {
 } from '../services/paystack.service.js'
 import { errorResponse, successResponse } from '../utils/response.utils.js'
 import { clientIp } from '../utils/clientIp.js'
+import { runPremiumReminders } from '../services/premiumReminders.service.js'
 import {
   FEATURE_KEYS,
   evaluateAccess,
@@ -246,7 +253,10 @@ export const patchUser = asyncHandler(async (req: Request, res: Response) => {
     errorResponse(res, 'Administrator accounts cannot be changed here.', 403)
     return
   }
-  if (parsed.data.plan !== undefined) u.plan = parsed.data.plan
+  if (parsed.data.plan !== undefined) {
+    u.plan = parsed.data.plan
+    u.premiumKind = parsed.data.plan === 'premium' ? 'gift' : null
+  }
   if (parsed.data.disabled !== undefined) {
     u.disabled = parsed.data.disabled
     if (parsed.data.disabled) u.refreshTokens = [] // sign them out everywhere
@@ -420,11 +430,39 @@ const billingSchema = z
     enabled: z.boolean().optional(),
     freeLibraryLimit: z.number().int().min(1).max(1000).optional(),
     plans: z.array(planSchema).max(MAX_PLANS).optional(),
+    trialDays: z.number().int().min(0).max(MAX_TRIAL_DAYS).optional(),
+    reminders: z
+      .object({
+        enabled: z.boolean(),
+        steps: z
+          .array(
+            z
+              .object({
+                offsetDays: z.number().int().min(MIN_REMINDER_OFFSET).max(MAX_REMINDER_OFFSET),
+                inApp: z.boolean(),
+                email: z.boolean(),
+              })
+              .strict(),
+          )
+          .max(MAX_REMINDER_STEPS),
+      })
+      .strict()
+      .optional(),
+    marketing: z
+      .object({
+        headline: z.string().trim().max(80),
+        showPerDay: z.boolean(),
+        showSavings: z.boolean(),
+      })
+      .strict()
+      .optional(),
   })
   .strict()
 
 const billingView = async () => ({
   billing: await getBillingConfig(),
+  /** What users see under each active plan, calculated by the server (same as the app). */
+  preview: planHooks(await getBillingConfig()),
   paystack: {
     configured: paystackConfigured(),
     mode: paystackMode(),
@@ -440,7 +478,7 @@ export const getBilling = asyncHandler(async (_req: Request, res: Response) => {
 })
 
 /**
- * PUT /admin/billing { enabled?, freeLibraryLimit?, plans? }
+ * PUT /admin/billing { enabled?, freeLibraryLimit?, plans?, trialDays?, reminders?, marketing? }
  * Prices are in KOBO (₦1 = 100 kobo). Turning payments ON needs Paystack keys on
  * the server and at least one active plan.
  */
@@ -456,6 +494,16 @@ export const setBilling = asyncHandler(async (req: Request, res: Response) => {
     ...(parsed.data.enabled === undefined ? {} : { enabled: parsed.data.enabled }),
     ...(parsed.data.freeLibraryLimit === undefined ? {} : { freeLibraryLimit: parsed.data.freeLibraryLimit }),
     ...(parsed.data.plans === undefined ? {} : { plans: normalizePlansInput(parsed.data.plans) }),
+    ...(parsed.data.trialDays === undefined ? {} : { trialDays: parsed.data.trialDays }),
+    ...(parsed.data.reminders === undefined
+      ? {}
+      : {
+          reminders: {
+            enabled: parsed.data.reminders.enabled,
+            steps: normalizeReminderSteps(parsed.data.reminders.steps),
+          },
+        }),
+    ...(parsed.data.marketing === undefined ? {} : { marketing: parsed.data.marketing }),
   }
 
   if (next.enabled && !paystackConfigured()) {
@@ -481,8 +529,20 @@ export const setBilling = asyncHandler(async (req: Request, res: Response) => {
     enabled: next.enabled,
     freeLibraryLimit: next.freeLibraryLimit,
     plans: next.plans.map((p) => `${p.name}: ${formatNaira(p.priceKobo)} / ${p.durationDays}d${p.active ? '' : ' (off)'}`),
+    trialDays: next.trialDays,
+    reminders: next.reminders.enabled
+      ? next.reminders.steps.map((st) => `${st.offsetDays}d${st.inApp ? ' app' : ''}${st.email ? ' email' : ''}`)
+      : 'off',
+    headline: next.marketing.headline,
   })
   successResponse(res, await billingView(), 'Saved.')
+})
+
+/** POST /admin/billing/reminders/run — send the reminder e-mails that are due right now (normally hourly). */
+export const runRemindersNow = asyncHandler(async (req: Request, res: Response) => {
+  const r = await runPremiumReminders()
+  await audit(req, 'billing.reminders.run', null, r)
+  successResponse(res, r, r.sent === 0 ? 'No reminders were due.' : `Sent ${r.sent} reminder e-mail(s).`)
 })
 
 /** GET /admin/payments?status=&page=&limit= */

@@ -105,10 +105,34 @@ export interface BillingConfig {
   currency: 'NGN'
   plans: Plan[]
   freeLibraryLimit: number
+  /** Free Premium trial for new accounts, once per account (0 = off). */
+  trialDays: number
+  reminders: ReminderConfig
+  marketing: MarketingConfig
+}
+
+/** offsetDays: -5 = five days before Premium ends, 0 = the day it ends, 3 = three days after. */
+export interface ReminderStep {
+  offsetDays: number
+  inApp: boolean
+  email: boolean
+}
+
+export interface ReminderConfig {
+  enabled: boolean
+  steps: ReminderStep[]
+}
+
+export interface MarketingConfig {
+  headline: string
+  showPerDay: boolean
+  showSavings: boolean
 }
 
 export interface BillingView {
   billing: BillingConfig
+  /** Server-calculated texts under each active plan (exactly what the app shows). */
+  preview?: { id: string; perDayText: string; savingsText: string }[]
   paystack: {
     configured: boolean
     mode: 'test' | 'live' | 'not configured'

@@ -27,7 +27,54 @@ export interface BillingConfig {
   plans: Plan[]
   /** Books a Free user may keep in the library. */
   freeLibraryLimit: number
+  /** Free Premium trial for new accounts, once per account (0 = off). */
+  trialDays: number
+  /** When users are reminded that Premium is ending / has ended. */
+  reminders: ReminderConfig
+  /** Wording on the Premium screen. */
+  marketing: MarketingConfig
 }
+
+/**
+ * One reminder moment, relative to the day Premium ends:
+ * -5 = five days before, 0 = the day it ends, 3 = three days after.
+ */
+export interface ReminderStep {
+  offsetDays: number
+  inApp: boolean
+  email: boolean
+}
+
+export interface ReminderConfig {
+  enabled: boolean
+  steps: ReminderStep[]
+}
+
+export interface MarketingConfig {
+  /** Big line on the Premium screen; empty = the app's default text. */
+  headline: string
+  /** Show "less than ₦24 a day" under each plan. */
+  showPerDay: boolean
+  /** Show "2 months free · save ₦1,400" on longer plans. */
+  showSavings: boolean
+}
+
+export const MAX_REMINDER_STEPS = 6
+export const MIN_REMINDER_OFFSET = -30
+export const MAX_REMINDER_OFFSET = 30
+export const MAX_TRIAL_DAYS = 90
+
+export const DEFAULT_REMINDERS: ReminderConfig = {
+  enabled: true,
+  steps: [
+    { offsetDays: -5, inApp: true, email: true },
+    { offsetDays: -2, inApp: true, email: true },
+    { offsetDays: 0, inApp: true, email: true },
+    { offsetDays: 3, inApp: true, email: true },
+  ],
+}
+
+export const DEFAULT_MARKETING: MarketingConfig = { headline: '', showPerDay: true, showSavings: true }
 
 export const MAX_PLANS = 6
 export const MIN_PRICE_KOBO = 5_000 // ₦50
@@ -38,6 +85,9 @@ export const DEFAULT_BILLING: BillingConfig = {
   currency: 'NGN',
   plans: [],
   freeLibraryLimit: 10,
+  trialDays: 0,
+  reminders: DEFAULT_REMINDERS,
+  marketing: DEFAULT_MARKETING,
 }
 
 const str = (v: unknown, max: number): string => (typeof v === 'string' ? v.trim().slice(0, max) : '')
@@ -93,27 +143,116 @@ export const mergeBilling = (saved: unknown): BillingConfig => {
     currency: 'NGN',
     plans,
     freeLibraryLimit: int(s['freeLibraryLimit'], 1, 1000, DEFAULT_BILLING.freeLibraryLimit),
+    trialDays: int(s['trialDays'], 0, MAX_TRIAL_DAYS, 0),
+    reminders: mergeReminders(s['reminders']),
+    marketing: mergeMarketing(s['marketing']),
   }
 }
 
-/** What the mobile app may see: only active plans, nothing else. */
-export const publicBilling = (cfg: BillingConfig) => ({
-  enabled: cfg.enabled,
-  currency: cfg.currency,
-  freeLibraryLimit: cfg.freeLibraryLimit,
-  plans: cfg.enabled
-    ? cfg.plans
-        .filter((p) => p.active)
-        .map((p) => ({
+/** Clean reminder steps: unique offsets, sorted, within limits. */
+export const normalizeReminderSteps = (raw: unknown): ReminderStep[] => {
+  const seen = new Set<number>()
+  const out: ReminderStep[] = []
+  for (const r of Array.isArray(raw) ? (raw as unknown[]) : []) {
+    if (!r || typeof r !== 'object') continue
+    const o = r as Record<string, unknown>
+    if (typeof o['offsetDays'] !== 'number' || !Number.isFinite(o['offsetDays'])) continue
+    const offsetDays = int(o['offsetDays'], MIN_REMINDER_OFFSET, MAX_REMINDER_OFFSET, 0)
+    if (seen.has(offsetDays)) continue
+    seen.add(offsetDays)
+    out.push({ offsetDays, inApp: o['inApp'] !== false, email: o['email'] !== false })
+  }
+  return out.sort((a, b) => a.offsetDays - b.offsetDays).slice(0, MAX_REMINDER_STEPS)
+}
+
+const mergeReminders = (raw: unknown): ReminderConfig => {
+  if (!raw || typeof raw !== 'object') return DEFAULT_REMINDERS
+  const o = raw as Record<string, unknown>
+  return {
+    enabled: o['enabled'] !== false,
+    steps: Array.isArray(o['steps']) ? normalizeReminderSteps(o['steps']) : DEFAULT_REMINDERS.steps,
+  }
+}
+
+const mergeMarketing = (raw: unknown): MarketingConfig => {
+  if (!raw || typeof raw !== 'object') return DEFAULT_MARKETING
+  const o = raw as Record<string, unknown>
+  return {
+    headline: str(o['headline'], 80),
+    showPerDay: o['showPerDay'] !== false,
+    showSavings: o['showSavings'] !== false,
+  }
+}
+
+/** What the mobile app may see: only active plans, nothing else. Extra fields are ignored by older apps. */
+export const publicBilling = (cfg: BillingConfig) => {
+  const active = cfg.plans.filter((p) => p.active)
+  return {
+    enabled: cfg.enabled,
+    currency: cfg.currency,
+    freeLibraryLimit: cfg.freeLibraryLimit,
+    trialDays: cfg.trialDays,
+    headline: cfg.marketing.headline,
+    /** Offsets (days from the end of Premium) at which the app shows its banner. */
+    reminders: cfg.reminders.enabled ? cfg.reminders.steps.filter((s) => s.inApp).map((s) => s.offsetDays) : [],
+    plans: cfg.enabled
+      ? active.map((p) => ({
           id: p.id,
           name: p.name,
           description: p.description,
           priceKobo: p.priceKobo,
           durationDays: p.durationDays,
           badge: p.badge,
+          perDayText: cfg.marketing.showPerDay ? perDayText(p.priceKobo, p.durationDays) : '',
+          savingsText: cfg.marketing.showSavings ? savingsText(p, active) : '',
         }))
-    : [],
-})
+      : [],
+  }
+}
+
+/** The hook texts of every ACTIVE plan (admin preview; same texts the app gets). */
+export const planHooks = (cfg: BillingConfig): { id: string; perDayText: string; savingsText: string }[] => {
+  const active = cfg.plans.filter((p) => p.active)
+  return active.map((p) => ({
+    id: p.id,
+    perDayText: cfg.marketing.showPerDay ? perDayText(p.priceKobo, p.durationDays) : '',
+    savingsText: cfg.marketing.showSavings ? savingsText(p, active) : '',
+  }))
+}
+
+/** Whole months in a plan (30 → 1, 365 → 12); 0 for plans shorter than ~4 weeks. */
+export const planMonths = (durationDays: number): number => (durationDays >= 28 ? Math.round(durationDays / 30.4) : 0)
+
+/** "less than ₦24 a day" (or "just ₦20 a day" when it divides exactly into whole naira). */
+export const perDayText = (priceKobo: number, durationDays: number): string => {
+  if (durationDays < 1 || priceKobo <= 0) return ''
+  const perDayKobo = priceKobo / durationDays
+  if (Number.isInteger(perDayKobo) && perDayKobo % 100 === 0) return `just ${formatNaira(perDayKobo)} a day`
+  return `less than ${formatNaira(Math.ceil(perDayKobo / 100) * 100)} a day`
+}
+
+/**
+ * Saving of a longer plan compared with paying a shorter plan again and again:
+ * ₦7,000/year vs ₦700/month → "2 months free · save ₦1,400". Empty when there is no saving.
+ */
+export const savingsText = (
+  plan: Pick<Plan, 'priceKobo' | 'durationDays'>,
+  plans: Pick<Plan, 'priceKobo' | 'durationDays'>[],
+): string => {
+  const months = planMonths(plan.durationDays)
+  if (months < 2) return ''
+  const base = plans
+    .filter((p) => planMonths(p.durationDays) >= 1 && planMonths(p.durationDays) < months)
+    .sort((a, b) => a.durationDays - b.durationDays || a.priceKobo - b.priceKobo)[0]
+  if (!base) return ''
+  const monthly = base.priceKobo / planMonths(base.durationDays)
+  const saving = Math.round(monthly * months - plan.priceKobo)
+  if (saving < 100) return ''
+  const save = `save ${formatNaira(Math.round(saving / 100) * 100)}`
+  const freeMonths = saving / monthly
+  if (Number.isInteger(freeMonths)) return `${freeMonths} month${freeMonths === 1 ? '' : 's'} free · ${save}`
+  return `${save} (${Math.round((saving / (monthly * months)) * 100)}% off)`
+}
 
 /** "₦1,500" / "₦1,500.50" from kobo. */
 export const formatNaira = (kobo: number): string => {
@@ -182,3 +321,90 @@ export const limitMessage = (cfg: Pick<BillingConfig, 'enabled' | 'freeLibraryLi
   cfg.enabled
     ? `Free plan is limited to ${cfg.freeLibraryLimit} books. Upgrade to Premium for unlimited access.`
     : `Your library is limited to ${cfg.freeLibraryLimit} books. Remove a book to add a new one.`
+
+// ── Premium reminders & trial ────────────────────────────────────────────────
+
+/** A reminder is identified by its step AND the end date it was about (a renewal starts fresh). */
+export const reminderKey = (offsetDays: number, premiumUntil: Date): string =>
+  `${offsetDays}@${premiumUntil.toISOString()}`
+
+/** E-mails more than this late are skipped (server asleep, steps changed later, Premium given long ago). */
+export const REMINDER_STALE_MS = 2 * DAY_MS
+
+/**
+ * The reminder e-mail to send now, or null. Only the LATEST step that is due is sent (never several at
+ * once); earlier missed steps are skipped.
+ */
+export const dueEmailReminder = (
+  premiumUntil: Date | null,
+  now: Date,
+  cfg: ReminderConfig,
+  sent: readonly string[],
+): ReminderStep | null => {
+  if (!premiumUntil || !cfg.enabled) return null
+  const due = cfg.steps
+    .filter((s) => s.email)
+    .filter((s) => {
+      const at = premiumUntil.getTime() + s.offsetDays * DAY_MS
+      return now.getTime() >= at && now.getTime() - at < REMINDER_STALE_MS
+    })
+    .sort((a, b) => b.offsetDays - a.offsetDays)[0]
+  if (!due || sent.includes(reminderKey(due.offsetDays, premiumUntil))) return null
+  return due
+}
+
+/** premiumUntil range in which a reminder e-mail can be due now — picks candidate users from the database. */
+export const reminderWindow = (cfg: ReminderConfig, now: Date): { from: Date; to: Date } | null => {
+  const steps = cfg.steps.filter((s) => s.email)
+  if (!cfg.enabled || steps.length === 0) return null
+  const min = Math.min(...steps.map((s) => s.offsetDays))
+  const max = Math.max(...steps.map((s) => s.offsetDays))
+  // due when premiumUntil + offset <= now < premiumUntil + offset + stale
+  return {
+    from: new Date(now.getTime() - max * DAY_MS - REMINDER_STALE_MS),
+    to: new Date(now.getTime() - min * DAY_MS),
+  }
+}
+
+export type InAppReminder =
+  | { kind: 'before'; daysLeft: number; premiumUntil: string }
+  | { kind: 'today'; premiumUntil: string }
+  | { kind: 'after'; daysAgo: number; premiumUntil: string }
+
+/**
+ * What the in-app banner should say now (null = no banner). Shown from the first in-app step until 7 days
+ * after the last step, never more than 30 days after Premium ended.
+ */
+export const inAppReminder = (
+  premiumUntil: Date | null,
+  now: Date,
+  offsets: readonly number[],
+): InAppReminder | null => {
+  if (!premiumUntil || offsets.length === 0) return null
+  const end = premiumUntil.getTime()
+  const t = now.getTime()
+  const first = end + Math.min(...offsets) * DAY_MS
+  const last = end + Math.max(...offsets) * DAY_MS
+  if (t < first || t > last + 7 * DAY_MS || t > end + 30 * DAY_MS) return null
+  const iso = premiumUntil.toISOString()
+  if (t < end) {
+    const daysLeft = Math.ceil((end - t) / DAY_MS)
+    return daysLeft <= 1 ? { kind: 'today', premiumUntil: iso } : { kind: 'before', daysLeft, premiumUntil: iso }
+  }
+  const daysAgo = Math.floor((t - end) / DAY_MS)
+  return daysAgo === 0 ? { kind: 'today', premiumUntil: iso } : { kind: 'after', daysAgo, premiumUntil: iso }
+}
+
+export type PremiumKind = 'paid' | 'trial' | 'gift'
+
+/** Whether a free trial may start for this account (the server re-checks atomically when starting it). */
+export const trialAvailable = (
+  cfg: Pick<BillingConfig, 'trialDays'>,
+  user: { plan: 'free' | 'premium'; premiumUntil: Date | null; premiumTrialUsedAt: Date | null },
+  hasPaid: boolean,
+  now: Date,
+): boolean =>
+  cfg.trialDays > 0 &&
+  !user.premiumTrialUsedAt &&
+  !hasPaid &&
+  effectivePlan(user.plan, user.premiumUntil, now) === 'free'

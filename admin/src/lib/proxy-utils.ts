@@ -25,6 +25,7 @@ const ALLOWED: RegExp[] = [
   /^config\/features\/[a-z_]{1,40}$/,
   /^billing$/,
   /^billing\/test$/,
+  /^billing\/reminders\/run$/,
   /^payments$/,
   /^users$/,
   /^users\/[a-f0-9]{24}$/,

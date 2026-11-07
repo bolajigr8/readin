@@ -17,6 +17,14 @@ export interface IUser extends Document {
   premiumUntil: Date | null
   /** Timestamp of the last RevenueCat event applied (ignores late, out-of-order events). */
   premiumEventAt: Date | null
+  /** How the current Premium period came about (wording of reminders): paid | trial | gift. */
+  premiumKind: 'paid' | 'trial' | 'gift' | null
+  /** When the one free Premium trial was started (null = never). */
+  premiumTrialUsedAt: Date | null
+  /** Reminder e-mails already sent, as `offset@premiumUntilISO` keys (exactly once each). */
+  premiumRemindersSent: string[]
+  /** The user may switch off Premium reminder e-mails (Profile). */
+  emailReminders: boolean
   isEmailVerified: boolean
   emailVerificationToken: string | null
   emailVerificationExpires: Date | null
@@ -83,6 +91,23 @@ const userSchema = new Schema<IUser>(
     premiumEventAt: {
       type: Date,
       default: null,
+    },
+    premiumKind: {
+      type: String,
+      enum: ['paid', 'trial', 'gift', null],
+      default: null,
+    },
+    premiumTrialUsedAt: {
+      type: Date,
+      default: null,
+    },
+    premiumRemindersSent: {
+      type: [String],
+      default: [],
+    },
+    emailReminders: {
+      type: Boolean,
+      default: true,
     },
     isEmailVerified: {
       type: Boolean,

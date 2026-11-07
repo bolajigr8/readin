@@ -15,3 +15,19 @@
 - Done: typecheck ✅ lint 0 errors ✅ unit (new tests/client-ip.test.mjs 6) ✅ e2e 29/29 ✅ (e2e = non-production → req.ip path).
 - NOT tested: real Render headers. After deploy the log must show `[client-ip] using cf-connecting-ip …`; then re-probe:
   RateLimit-Remaining must count down steadily (no restarts at 199/900).
+
+## S9.2 part A (approved by Michael 2026-11-07) — branch `feat/s9-premium-controls`
+Plan: BillingConfig += `trialDays` (0=off), `reminders {enabled, steps[{offsetDays, inApp, email}]}` (default −5,−2,0,+3),
+`marketing {headline, showPerDay, showSavings}`. Pure logic in billing.logic.ts: perDayText, savingsText (months =
+round(days/30)), dueEmailReminder (one per run, latest due step, ≤2 days stale, key `offset@premiumUntilISO`), inAppReminder.
+User += `premiumKind` ('paid'|'trial'|'gift'|null), `premiumTrialUsedAt`, `premiumRemindersSent: string[]`,
+`emailReminders` (default true) — additive, no migration. New `/api/v1/billing`: GET /status, POST /trial (once per
+account, atomic), PATCH /reminders {email}. Hourly in-process sweep e-mails due reminders (exactly once).
+Admin Billing page: Free trial, Reminders, Hook text sections. Prices ₦700/30d + ₦7,000/365d are entered by Michael.
+- Part A DONE: server (commit a62cfc4 + admin preview) and admin Billing page: new cards "Premium screen wording",
+  "Free Premium trial", "Premium reminders" (+ "Send due reminders now"), plan rows show server-calculated hooks,
+  quick-add buttons now ₦700/30 d and ₦7,000/365 d. Proxy ALLOWED + test: `billing/reminders/run`.
+  Checks: server typecheck/lint/unit (35 new)/e2e 32 ✅; admin tsc ✅ lint 0 errors ✅ build ✅ proxy test ✅.
+  NOT done: admin screenshots (needs a local server — ask Michael first). Admin Next 16.4.0 security warning at build
+  (known, DECISIONS #19) → separate upgrade branch, ask Michael.
+- Next: part B (app: Premium screen hooks + trial button, Home banner, Profile switch), part C (site prices).

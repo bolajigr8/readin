@@ -19,6 +19,7 @@ import { useApi } from '@/hooks/use-api'
 import { api } from '@/lib/api'
 import type { AdminConfig, BillingConfig, BillingView, PaymentRow, PaymentsPage } from '@/lib/types'
 import { formatDateTime, formatNaira, nairaToKobo } from '@/lib/utils'
+import { FreeTrialCard, PremiumWording, RemindersCard } from './premium-controls'
 
 export default function BillingPage() {
   const view = useApi<BillingView>('billing')
@@ -52,7 +53,10 @@ export default function BillingPage() {
           <PaymentsSwitch view={view.data} habitsFree={config.data?.features['habits']?.freeForAll === true} habitsOn={config.data?.features['habits']?.enabled !== false} onChanged={reloadAll} />
           <PaystackCard paystack={view.data.paystack} />
           {/* remount when the saved plans change so the form starts from them */}
-          <PlansEditor key={JSON.stringify(view.data.billing)} billing={view.data.billing} onSaved={reloadAll} />
+          <PlansEditor key={JSON.stringify(view.data.billing)} billing={view.data.billing} preview={view.data.preview ?? []} onSaved={reloadAll} />
+          <PremiumWording key={`w-${JSON.stringify(view.data.billing.marketing)}`} billing={view.data.billing} onSaved={reloadAll} />
+          <FreeTrialCard key={`t-${view.data.billing.trialDays}`} billing={view.data.billing} onSaved={reloadAll} />
+          <RemindersCard key={`r-${JSON.stringify(view.data.billing.reminders)}`} billing={view.data.billing} onSaved={reloadAll} />
           <PaymentsTable page={payments.data} loading={payments.loading} />
         </div>
       )}
@@ -305,7 +309,15 @@ const toDraft = (p: BillingConfig['plans'][number]): Draft => ({
   badge: p.badge,
 })
 
-function PlansEditor({ billing, onSaved }: { billing: BillingConfig; onSaved: () => void }) {
+function PlansEditor({
+  billing,
+  preview,
+  onSaved,
+}: {
+  billing: BillingConfig
+  preview: NonNullable<BillingView['preview']>
+  onSaved: () => void
+}) {
   const [plans, setPlans] = useState<Draft[]>(() => billing.plans.map(toDraft))
   const [limit, setLimit] = useState(String(billing.freeLibraryLimit))
   const [saving, setSaving] = useState(false)
@@ -416,15 +428,20 @@ function PlansEditor({ billing, onSaved }: { billing: BillingConfig; onSaved: ()
             </div>
             <p className="text-xs text-muted-foreground">
               Users will see: <strong>{p.name || 'Plan'}</strong> &mdash; {nairaToKobo(p.price) ? formatNaira(nairaToKobo(p.price) as number) : '₦—'} for {p.days || '—'} days
+              {(() => {
+                const h = p.id ? preview.find((x) => x.id === p.id) : undefined
+                const extra = [h?.perDayText, h?.savingsText].filter(Boolean).join(' · ')
+                return extra ? <> &middot; <span className="text-foreground">{extra}</span></> : null
+              })()}
             </p>
           </div>
         ))}
 
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" disabled={plans.length >= 6} onClick={() => add('Monthly', '1500', '30')}>
+          <Button variant="outline" size="sm" disabled={plans.length >= 6} onClick={() => add('Monthly', '700', '30')}>
             <Plus /> Add Monthly (30 days)
           </Button>
-          <Button variant="outline" size="sm" disabled={plans.length >= 6} onClick={() => add('Yearly', '15000', '365')}>
+          <Button variant="outline" size="sm" disabled={plans.length >= 6} onClick={() => add('Yearly', '7000', '365')}>
             <Plus /> Add Yearly (365 days)
           </Button>
           <Button variant="outline" size="sm" disabled={plans.length >= 6} onClick={() => add('', '', '30')}>

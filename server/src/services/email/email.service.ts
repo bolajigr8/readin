@@ -47,6 +47,10 @@ export class EmailService {
   sendPaymentReceiptEmail(input: Parameters<IEmailProvider['sendPaymentReceiptEmail']>[0]): Promise<void> {
     return this.provider.sendPaymentReceiptEmail(input)
   }
+
+  sendPremiumReminderEmail(input: Parameters<IEmailProvider['sendPremiumReminderEmail']>[0]): Promise<void> {
+    return this.provider.sendPremiumReminderEmail(input)
+  }
 }
 
 // ── Singleton — swap `new ResendProvider()` here to change the active provider

@@ -7,6 +7,7 @@ import {
   accountDeletionLinkEmail,
   passwordChangedEmail,
   passwordResetEmail,
+  premiumReminderEmail,
   receiptEmail,
   verificationEmail,
   welcomeEmail,
@@ -83,5 +84,10 @@ export class ResendProvider implements IEmailProvider {
         premiumUntil: input.premiumUntil,
       }),
     )
+  }
+
+  sendPremiumReminderEmail(input: Parameters<IEmailProvider['sendPremiumReminderEmail']>[0]): Promise<void> {
+    const { to, ...rest } = input
+    return this.send(to, premiumReminderEmail(rest))
   }
 }

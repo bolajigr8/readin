@@ -153,6 +153,7 @@ const env = {
   PAYSTACK_BASE_URL: `http://127.0.0.1:${fakePort}/paystack`,
   UPSTASH_REDIS_URL: `redis://127.0.0.1:${deadRedisPort}`,
   REDIS_COMMAND_TIMEOUT_MS: '300',
+  PREMIUM_REMINDERS_INTERVAL_MS: '0', // the test runs the reminder check itself (admin button)
   REDIS_STARTUP_GRACE_MS: '0', // dead Redis on purpose: no startup grace, fail open straight away
   ADMIN_EMAILS: ADMIN_EMAIL,
   CONVERSION_ENABLED: 'false',
@@ -638,6 +639,92 @@ try {
     const r = await call('POST', '/auth/delete-account/confirm', { body: { token: link } })
     assert.equal(r.status, 400)
     assert.equal(await users.countDocuments({ email: gina }), 1)
+  })
+
+  // ── S9.2: Premium controls (trial, reminders, hook text) ──────────────────
+  await test('S9.2 admin: trial, reminders and hook text are saved; a bad reminder day is refused', async () => {
+    const bad = await call('PUT', '/admin/billing', {
+      token: adminToken,
+      body: { reminders: { enabled: true, steps: [{ offsetDays: 99, inApp: true, email: true }] } },
+    })
+    assert.equal(bad.status, 400, bad.text)
+    const r = await call('PUT', '/admin/billing', {
+      token: adminToken,
+      body: {
+        trialDays: 7,
+        marketing: { headline: 'Read without limits', showPerDay: true, showSavings: true },
+        reminders: {
+          enabled: true,
+          steps: [
+            { offsetDays: 3, inApp: true, email: true },
+            { offsetDays: -5, inApp: true, email: true },
+          ],
+        },
+      },
+    })
+    assert.equal(r.status, 200, r.text)
+    assert.equal(r.json.data.billing.trialDays, 7)
+    assert.deepEqual(r.json.data.billing.reminders.steps.map((x) => x.offsetDays), [-5, 3])
+    const pub = await call('GET', '/config/public')
+    assert.equal(pub.json.data.billing.trialDays, 7)
+    assert.equal(pub.json.data.billing.headline, 'Read without limits')
+    assert.deepEqual(pub.json.data.billing.reminders, [-5, 3])
+  })
+
+  await test('S9.2 free trial: starts once (7 days Premium), never twice, even with parallel taps', async () => {
+    const tara = 'tara@readin.test'
+    await registerAndVerify(tara, 'Tara')
+    const tok = await login(tara)
+    let s = await call('GET', '/billing/status', { token: tok })
+    assert.equal(s.status, 200, s.text)
+    assert.equal(s.json.data.plan, 'free')
+    assert.deepEqual([s.json.data.trial.available, s.json.data.trial.days], [true, 7])
+    const r = await call('POST', '/billing/trial', { token: tok })
+    assert.equal(r.status, 200, r.text)
+    assert.equal(r.json.data.plan, 'premium')
+    assert.equal(r.json.data.premiumKind, 'trial')
+    const left = new Date(r.json.data.premiumUntil).getTime() - Date.now()
+    assert.ok(Math.abs(left - 7 * DAY) < 60_000, `trial length ${left}`)
+    assert.equal((await me(tok)).plan, 'premium')
+    assert.equal((await call('POST', '/billing/trial', { token: tok })).status, 409)
+    s = await call('GET', '/billing/status', { token: tok })
+    assert.equal(s.json.data.trial.available, false)
+
+    const tom = 'tom@readin.test'
+    await registerAndVerify(tom, 'Tom')
+    const tok2 = await login(tom)
+    const many = await Promise.all([1, 2, 3, 4].map(() => call('POST', '/billing/trial', { token: tok2 })))
+    assert.equal(many.filter((x) => x.status === 200).length, 1, many.map((x) => x.status).join(','))
+  })
+
+  await test('S9.2 reminder e-mail: sent exactly once when due; banner shows; switch-off respected', async () => {
+    const rita = 'rita@readin.test'
+    const raul = 'raul@readin.test'
+    await registerAndVerify(rita, 'Rita')
+    await registerAndVerify(raul, 'Raul')
+    const tokRita = await login(rita)
+    const tokRaul = await login(raul)
+    const off = await call('PATCH', '/billing/reminders', { token: tokRaul, body: { email: false } })
+    assert.equal(off.status, 200, off.text)
+    // Premium ends in 5 days minus 1 hour → the "5 days before" step is due now
+    const until = new Date(Date.now() + 5 * DAY - 3_600_000)
+    await users.updateMany({ email: { $in: [rita, raul] } }, { $set: { plan: 'premium', premiumUntil: until, premiumKind: 'paid' } })
+    const m0 = mails.length
+    const r1 = await call('POST', '/admin/billing/reminders/run', { token: adminToken })
+    assert.equal(r1.status, 200, r1.text)
+    const mail = await nextMailTo(rita, m0, /ends in 5 days/i)
+    assert.match(mail.text, /Profile → Premium/)
+    const r2 = await call('POST', '/admin/billing/reminders/run', { token: adminToken })
+    assert.equal(r2.status, 200)
+    await sleep(500)
+    const toRita = mails.slice(m0).filter((m) => m.to === rita)
+    assert.equal(toRita.length, 1, `Rita got ${toRita.length} reminder e-mails`)
+    assert.equal(mails.slice(m0).filter((m) => m.to === raul).length, 0, 'Raul switched reminders off')
+    const st = await call('GET', '/billing/status', { token: tokRita })
+    assert.equal(st.json.data.reminder.kind, 'before')
+    assert.equal(st.json.data.reminder.daysLeft, 5)
+    assert.equal(st.json.data.emailReminders, true)
+    assert.ok(!serverLog.includes(rita), 'reminder log must not contain the e-mail address')
   })
 
   await test('the server log never prints the Paystack key or JWT secrets', async () => {
