@@ -88,4 +88,4 @@ async function handler(req: NextRequest) {
   return res
 }
 
-export { handler as GET, handler as POST, handler as PUT, handler as PATCH }
+export { handler as GET, handler as POST, handler as PUT, handler as PATCH, handler as DELETE }

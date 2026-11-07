@@ -41,11 +41,11 @@ Order matters: S0 → S1 → S2 → S3 are needed to start acquiring users safel
 - [x] S4.3 [C] (done 2026-11-07: test/features/app_lock_test.dart 9; manual phone list in the session log) Tests (provider logic with fake service, lifecycle timing) + manual device test list.
 
 ## S5 — Admin team & roles — see ADMIN_ROLES_PLAN.md ⚠ (DB schema + auth)
-- [ ] S5.1 [C] Server: roles `user | tester | admin | owner`, `permissions[]`, migration (existing `role:'admin'` + `ADMIN_EMAILS` → `owner`), `requirePermission()`, last-owner protection, audit entries, session revocation on role change. `ADMIN_EMAILS` stays as *break-glass owner bootstrap* only.
-- [ ] S5.2 [C] Endpoints: `GET/POST/PATCH/DELETE /admin/team…`, `PATCH /admin/users/:id/role`; re-authentication (password) for team changes.
-- [ ] S5.3 [C] Admin UI: **Team** page (list, add by e-mail, role + permission checkboxes with plain explanations, remove), role selector on the user page, sidebar items hidden by permission (server enforces), Guide page updated.
-- [ ] S5.4 [C] Entitlements: `tester` = all features + Premium-equivalent without admin access; document in Features help text.
-- [ ] S5.5 [C] Tests: permission matrix (every route × every role), cannot demote self/last owner, e2e.
+- [x] S5.1 [C] (done 2026-11-07: roles.logic, requireStaff + can(), migrate-roles.ts) Server: roles `user | tester | admin | owner`, `permissions[]`, migration (existing `role:'admin'` + `ADMIN_EMAILS` → `owner`), `requirePermission()`, last-owner protection, audit entries, session revocation on role change. `ADMIN_EMAILS` stays as *break-glass owner bootstrap* only.
+- [x] S5.2 [C] (done 2026-11-07: /admin/team, role via PATCH /admin/users/:id {role: user|tester}; password re-check) Endpoints: `GET/POST/PATCH/DELETE /admin/team…`, `PATCH /admin/users/:id/role`; re-authentication (password) for team changes.
+- [x] S5.3 [C] (done 2026-11-07: Team page, Tester switch, menu by permission) Admin UI: **Team** page (list, add by e-mail, role + permission checkboxes with plain explanations, remove), role selector on the user page, sidebar items hidden by permission (server enforces), Guide page updated.
+- [x] S5.4 [C] (done 2026-11-07) Entitlements: `tester` = all features + Premium-equivalent without admin access; document in Features help text.
+- [x] S5.5 [C] (done 2026-11-07: route test + roles unit 12 + e2e 3) Tests: permission matrix (every route × every role), cannot demote self/last owner, e2e.
 - [ ] S5.6 [later] TOTP 2FA for admin/owner.
 
 ## S6 — Firebase Analytics + Crashlytics — see ANALYTICS_PLAN.md ⚠ (privacy)

@@ -16,3 +16,13 @@ Branch `feat/s5-admin-team` (from main; `chore/site-release-1.0.1` + `chore/smal
 - Migration `src/scripts/migrate-roles.ts` (idempotent, dry run by default): listed admins → owner, other admins →
   admin with all permissions except team.manage. Michael: Atlas backup first.
 - Admin panel: Team page, role selector (User/Tester) on the user page, sidebar by permission, login accepts owner/admin.
+
+## Done
+- Server: commit 8348b43 (roles, requireStaff/can on every route, team API, tester, migration). typecheck ✅ lint 0 errors ✅
+  unit (roles 12 + route test) ✅ e2e 36 ✅ (route-test mutation: removing one can() → fails ✅).
+- Admin: login accepts owner/admin; AppShell uses /me (found: it used /stats as the session check — an admin without
+  dashboard.read would have been stuck); menu by permission + "no permission" panel; Team page; Tester switch; Guide;
+  proxy me/team + DELETE only for team/:id. tsc ✅ lint 0 errors ✅ build ✅ proxy test ✅; Edge screenshots (owner Team
+  page; Support admin on /billing → friendly panel, menu Dashboard/Users/Guide) at 1280/390 px, no overflow/errors.
+- Michael after merge: (optional) Atlas backup → `npx tsx src/scripts/migrate-roles.ts` (dry run) on Render shell — not
+  required: his ADMIN_EMAILS account is an owner automatically. Then add helpers on Team; testers via Users → Tester.

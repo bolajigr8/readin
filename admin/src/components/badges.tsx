@@ -22,7 +22,9 @@ export function PlanBadge({ plan }: { plan: UserRow['plan'] }) {
 export function StatusBadges({ user }: { user: Pick<UserRow, 'role' | 'disabled' | 'isEmailVerified'> }) {
   return (
     <span className="flex flex-wrap gap-1">
+      {user.role === 'owner' && <Badge variant="info">Owner</Badge>}
       {user.role === 'admin' && <Badge variant="info">Admin</Badge>}
+      {user.role === 'tester' && <Badge variant="success">Tester</Badge>}
       {user.disabled && <Badge variant="danger">Disabled</Badge>}
       {!user.isEmailVerified && <Badge variant="warning">Unverified</Badge>}
     </span>

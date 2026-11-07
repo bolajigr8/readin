@@ -10,7 +10,9 @@ const TERMS: Array<[string, string]> = [
   ['Block', 'Takes a feature away from ONE user, even if they are Premium. Reversible.'],
   ['Disabled account', 'The user cannot sign in at all and is signed out everywhere. Reversible. Their data is kept.'],
   ['Verified e-mail', 'The user confirmed their address by clicking the link in the welcome e-mail. Unverified users cannot sign in. You can verify someone by hand on their page.'],
-  ['Administrator', 'An account with the Admin role. Created only with a script on your computer — never from this panel. Admins can always use every feature.'],
+  ['Owner', 'Full control, including the Team page. You are an owner (your e-mail is in ADMIN_EMAILS on the server — your safety key). There is always at least one owner.'],
+  ['Admin', 'A helper you add on the Team page. They can only do what you tick for them (for example Support or Release manager). They use every app feature for free.'],
+  ['Tester', 'Someone in your closed test (switch on Tester on their user page): every feature and Premium for free, no access to this panel.'],
   ['Kobo', '₦1 = 100 kobo. Paystack works in kobo; this panel shows and accepts naira, so you never type kobo.'],
 ]
 

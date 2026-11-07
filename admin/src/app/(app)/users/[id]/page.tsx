@@ -72,7 +72,8 @@ export default function UserDetailPage() {
   }
 
   const u = data.user
-  const isAdmin = u.role === 'admin'
+  // Team members (owners / admins) are changed only on the Team page (S5).
+  const isAdmin = u.role === 'admin' || u.role === 'owner'
   const dayCount = Number(days)
   const daysValid = Number.isInteger(dayCount) && dayCount >= 1 && dayCount <= 3650
 
@@ -127,7 +128,7 @@ export default function UserDetailPage() {
           <CardHeader>
             <CardTitle>Plan & access</CardTitle>
             <CardDescription>
-              {isAdmin ? 'Administrator accounts can only be changed on the server.' : 'Changes apply immediately.'}
+              {isAdmin ? 'Team members are changed on the Team page (owners only).' : 'Changes apply immediately.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
@@ -161,7 +162,23 @@ export default function UserDetailPage() {
                 }}
               />
             </div>
+            <Separator />
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label htmlFor="tester">Tester</Label>
+                <p className="text-xs text-muted-foreground">Gets every feature and Premium for free, to help you test. No admin access.</p>
+              </div>
+              <Switch
+                id="tester"
+                checked={u.role === 'tester'}
+                disabled={isAdmin || busy !== null}
+                onCheckedChange={(on) =>
+                  run('role', () => api(`users/${id}`, { method: 'PATCH', body: { role: on ? 'tester' : 'user' } }), on ? 'This person is now a tester.' : 'No longer a tester.')
+                }
+              />
+            </div>
             <Explain>
+              <p><strong>Tester:</strong> for the people in your closed test. They use the app like Premium members with every feature switched on, without paying and without any access to this panel. Switch it off when the test ends.</p>
               <p><strong>Premium plan:</strong> switching it on gives this user Premium <em>with no end date</em> (a gift that lasts until you switch it off). People who pay through Paystack get Premium for the days of their plan and it ends by itself &mdash; the &ldquo;Subscription period ends&rdquo; row in Account shows that date.</p>
               <p><strong>Account disabled:</strong> the user is signed out on every device and cannot sign in or use the app until you enable the account again. Their data is kept.</p>
             </Explain>

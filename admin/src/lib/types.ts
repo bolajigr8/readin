@@ -30,7 +30,7 @@ export interface UserRow {
   email: string
   displayName: string
   plan: 'free' | 'premium'
-  role: 'user' | 'admin'
+  role: Role
   disabled: boolean
   isEmailVerified: boolean
   createdAt: string
@@ -180,4 +180,35 @@ export interface AppReleaseRow {
   published: boolean
   releasedAt: string | null
   createdAt: string
+}
+
+// ── team & roles (S5) ─────────────────────────────────────────────────────────
+
+/** owner / admin = the team; tester = testing helper (Premium-equivalent, no admin panel). */
+export type Role = 'user' | 'tester' | 'admin' | 'owner'
+
+export interface AdminMe {
+  email: string
+  displayName: string
+  role: Role
+  permissions: string[]
+}
+
+export interface TeamMember {
+  id: string
+  email: string
+  displayName: string
+  role: 'admin' | 'owner'
+  permissions: string[]
+  /** Owner because of ADMIN_EMAILS on the server (cannot be changed in the panel). */
+  fixedOwner: boolean
+  lastLoginAt: string | null
+  roleChangedAt: string | null
+  disabled: boolean
+}
+
+export interface TeamPage {
+  items: TeamMember[]
+  permissions: { key: string; label: string }[]
+  presets: { key: string; label: string; permissions: string[] }[]
 }

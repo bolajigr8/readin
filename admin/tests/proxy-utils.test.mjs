@@ -9,7 +9,7 @@ const t = (name, fn) => { fn(); n++; console.log('ok -', name) }
 const id = 'a'.repeat(24)
 
 t('allows exactly the admin API paths', () => {
-  for (const p of ['stats', 'audit', 'config', 'config/features/habits', 'billing', 'billing/test', 'billing/reminders/run', 'payments', 'releases', `releases/${id}`, `users/${id}/verify`, 'users', `users/${id}`,
+  for (const p of ['stats', 'audit', 'config', 'config/features/habits', 'billing', 'billing/test', 'billing/reminders/run', 'payments', 'releases', `releases/${id}`, 'me', 'team', `team/${id}`, `users/${id}/verify`, 'users', `users/${id}`,
     `users/${id}/features/habits/grant`, `users/${id}/features/habits/reset-trial`]) {
     assert.equal(targetPath('/api/admin/' + p, 'GET'), p, p)
   }
@@ -26,6 +26,9 @@ t('rejects traversal, encoded slashes, unknown routes and bad ids', () => {
 
 t('methods: GET/POST/PUT/PATCH only', () => {
   assert.equal(targetPath('/api/admin/stats', 'DELETE'), null)
+  assert.equal(targetPath('/api/admin/users/' + id, 'DELETE'), null) // DELETE only for team members
+  assert.equal(targetPath('/api/admin/team/' + id, 'DELETE'), 'team/' + id)
+  assert.equal(targetPath('/api/admin/team', 'DELETE'), null)
   assert.equal(targetPath('/api/admin/stats', 'OPTIONS'), null)
   assert.equal(targetPath('/api/admin/stats', 'patch'), 'stats')
 })

@@ -24,5 +24,8 @@ Michael is not technical: every setting needs a plain explanation (use `Explain`
 ## Testing approach used so far
 `next build` + a throwaway mock API (small Node HTTP server) to exercise login/cookies/CSRF/whitelist/refresh and Playwright screenshots of each page. Recreate/commit it as `admin/tests/e2e/` when you next change auth or the proxy.
 
+## Team & roles (S5)
+Login accepts `owner`/`admin`. `AppShell` loads `/me` (role + permissions; session check) and `/stats` only with `dashboard.read`; `useCan()`; menu items have `need`; a page the person may not use shows a friendly "no permission" panel. Team page `/team` (owners). User page: Tester switch. Proxy: `me`, `team`, `team/:id`; DELETE allowed ONLY for `team/:id`.
+
 ## Planned
 Releases page (S2.2), Team page + permission-aware nav (S5), later 2FA. See `project/docs/ROADMAP.md`.

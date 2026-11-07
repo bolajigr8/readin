@@ -21,7 +21,7 @@ const fail = (status: number, message: string) => NextResponse.json({ message },
 /**
  * POST /api/auth/login — signs in through the ReadIn API and keeps the tokens in
  * httpOnly cookies (JavaScript in the browser can never read them).
- * Only accounts with role "admin" get a session.
+ * Only team accounts (role "owner" or "admin") get a session; what they may do is checked per request (S5).
  */
 export async function POST(req: NextRequest) {
   if (
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Only administrators may use this panel. Anyone else: undo the session we just opened.
-  if (data?.user?.role !== 'admin') {
+  if (data?.user?.role !== 'admin' && data?.user?.role !== 'owner') {
     await callApi('auth/logout', { method: 'POST', json: { refreshToken: rt } })
     return fail(403, 'This account is not an administrator.')
   }

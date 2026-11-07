@@ -29,6 +29,9 @@ const ALLOWED: RegExp[] = [
   /^payments$/,
   /^releases$/,
   /^releases\/[a-f0-9]{24}$/,
+  /^me$/,
+  /^team$/,
+  /^team\/[a-f0-9]{24}$/,
   /^users$/,
   /^users\/[a-f0-9]{24}$/,
   /^users\/[a-f0-9]{24}\/verify$/,
@@ -36,18 +39,22 @@ const ALLOWED: RegExp[] = [
 ]
 
 const METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH'])
+/** DELETE is allowed for exactly one thing: removing a team member (S5). */
+const DELETE_ALLOWED = /^team\/[a-f0-9]{24}$/
 
 /**
  * "/api/admin/users/abc" → "users/abc". Returns null for anything that is not an
  * exact, allowed admin API path (traversal, encoded slashes, unknown routes…).
  */
 export const targetPath = (pathname: string, method: string): string | null => {
-  if (!METHODS.has(method.toUpperCase())) return null
+  const isDelete = method.toUpperCase() === 'DELETE'
+  if (!METHODS.has(method.toUpperCase()) && !isDelete) return null
   if (!pathname.startsWith(PROXY_PREFIX)) return null
   const rest = pathname.slice(PROXY_PREFIX.length).replace(/\/+$/, '')
   if (!rest || rest.includes('..') || rest.includes('//') || rest.includes('%') || rest.includes('\\')) {
     return null
   }
+  if (isDelete) return DELETE_ALLOWED.test(rest) ? rest : null
   return ALLOWED.some((r) => r.test(rest)) ? rest : null
 }
 

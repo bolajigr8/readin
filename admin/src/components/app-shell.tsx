@@ -3,16 +3,18 @@
 import { createContext, useContext, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { BookOpen, CircleHelp, CreditCard, LayoutDashboard, Loader2, LogOut, PackageCheck, RefreshCw, ScrollText, SlidersHorizontal, Users } from 'lucide-react'
+import { BookOpen, CircleHelp, CreditCard, LayoutDashboard, Loader2, LogOut, PackageCheck, RefreshCw, ScrollText, ShieldCheck, SlidersHorizontal, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useApi } from '@/hooks/use-api'
-import type { Stats } from '@/lib/types'
+import type { AdminMe, Stats } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 interface StatsCtx {
   stats: Stats | undefined
   reloadStats: () => void
+  /** The signed-in team member (role + permissions). */
+  me: AdminMe | undefined
 }
 
 const StatsContext = createContext<StatsCtx | null>(null)
@@ -23,25 +25,37 @@ export function useStats(): StatsCtx {
   return ctx
 }
 
+/** Can the signed-in person use this? (The server checks again on every request.) */
+export function useCan(): (permission: string) => boolean {
+  const ctx = useContext(StatsContext)
+  return (p) => !!ctx?.me?.permissions.includes(p)
+}
+
+// `need` = the permission a page needs (S5); pages the person cannot use are hidden.
 const NAV = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/users', label: 'Users', icon: Users },
-  { href: '/features', label: 'Features', icon: SlidersHorizontal },
-  { href: '/billing', label: 'Billing', icon: CreditCard },
-  { href: '/releases', label: 'App versions', icon: PackageCheck },
-  { href: '/audit', label: 'Audit log', icon: ScrollText },
-  { href: '/guide', label: 'Guide', icon: CircleHelp },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, need: 'dashboard.read' },
+  { href: '/users', label: 'Users', icon: Users, need: 'users.read' },
+  { href: '/features', label: 'Features', icon: SlidersHorizontal, need: 'features.read' },
+  { href: '/billing', label: 'Billing', icon: CreditCard, need: 'billing.read' },
+  { href: '/releases', label: 'App versions', icon: PackageCheck, need: 'releases.write' },
+  { href: '/team', label: 'Team', icon: ShieldCheck, need: 'team.manage' },
+  { href: '/audit', label: 'Audit log', icon: ScrollText, need: 'audit.read' },
+  { href: '/guide', label: 'Guide', icon: CircleHelp, need: null },
 ]
 
 /**
  * Frame of every signed-in page. It also checks the session: the first request
- * (/stats) is admin-only, so a missing/expired session is detected here and
+ * (/me) is team-only, so a missing/expired session is detected here and
  * sends you to the sign-in page (see lib/api.ts).
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { data, error, loading, reload } = useApi<Stats>('stats')
+  const { data, error, loading, reload } = useApi<AdminMe>('me')
+  const stats = useApi<Stats>(data?.permissions.includes('dashboard.read') ? 'stats' : null)
+  const nav = NAV.filter((n) => n.need === null || !!data?.permissions.includes(n.need))
+  const here = NAV.find((n) => pathname === n.href || pathname.startsWith(n.href + '/'))
+  const allowedHere = !here || here.need === null || !!data?.permissions.includes(here.need)
   const [signingOut, setSigningOut] = useState(false)
 
   async function signOut() {
@@ -82,7 +96,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <StatsContext.Provider value={{ stats: data, reloadStats: reload }}>
+    <StatsContext.Provider value={{ stats: stats.data, reloadStats: stats.reload, me: data }}>
       <div className="flex min-h-screen flex-col md:flex-row">
         <aside className="border-b bg-sidebar md:sticky md:top-0 md:h-screen md:w-56 md:shrink-0 md:border-r md:border-b-0">
           <div className="flex items-center gap-2 px-4 py-4">
@@ -92,7 +106,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span className="font-semibold">ReadIn Admin</span>
           </div>
           <nav className="flex gap-1 overflow-x-auto px-2 pb-2 md:grid md:overflow-visible">
-            {NAV.map((item) => {
+            {nav.map((item) => {
               const active = pathname === item.href || pathname.startsWith(item.href + '/')
               return (
                 <Link
@@ -122,7 +136,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <LogOut /> Sign out
             </Button>
           </header>
-          <main className="mx-auto w-full max-w-6xl flex-1 p-4 md:p-8">{children}</main>
+          <main className="mx-auto w-full max-w-6xl flex-1 p-4 md:p-8">
+            {allowedHere ? (
+              children
+            ) : (
+              <div className="mx-auto mt-16 grid max-w-md gap-3 text-center">
+                <p className="text-lg font-semibold">You don&rsquo;t have permission for this page</p>
+                <p className="text-sm text-muted-foreground">
+                  Ask an owner of ReadIn to give you access on the Team page. You can use:{' '}
+                  {nav.map((n) => n.label).join(', ')}.
+                </p>
+                {nav[0] && (
+                  <Button className="mx-auto w-fit" onClick={() => router.replace(nav[0]!.href)}>
+                    Open {nav[0].label}
+                  </Button>
+                )}
+              </div>
+            )}
+          </main>
         </div>
       </div>
     </StatsContext.Provider>
